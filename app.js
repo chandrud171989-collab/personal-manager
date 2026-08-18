@@ -194,7 +194,10 @@ async function renderMaintenance() {
       ${items.length ? items.map(m => cardHTML({...m, _kind:'maintenance'})).join('') : emptyHTML('No items yet. Tap + to add one.')}
     </div>
   `;
-  /* ---------------- Finance ---------------- */
+  bindCardClicks();
+}
+
+/* ---------------- Finance ---------------- */
 
 function renderFinance() {
   viewEl.innerHTML = `
@@ -537,8 +540,6 @@ function calculateLoanTotal() {
 
 function formatFinanceMoney(value) {
   return Math.round(value).toLocaleString('en-IN');
-}
-  bindCardClicks();
 }
 
 function escapeHTML(str) {
