@@ -55,7 +55,7 @@ function updateAuthUI(user) {
   }
 }
 
-function showLoginScreen(mode = 'login', message = '') {
+function showLoginScreen(mode = 'login', message = '', prefillEmail = '') {
   authReady = true;
   currentUser = null;
 
@@ -199,6 +199,12 @@ function showLoginScreen(mode = 'login', message = '') {
     </div>
   `;
 
+  // Preserve the email when redirecting a user to Login/Forgot Password.
+  if (prefillEmail) {
+    const emailInput = document.getElementById('authEmail');
+    if (emailInput) emailInput.value = prefillEmail;
+  }
+
   const form = document.getElementById('authForm');
 
   form.addEventListener('submit', async (e) => {
@@ -237,7 +243,40 @@ function showLoginScreen(mode = 'login', message = '') {
           }
         });
 
-        if (error) throw error;
+        if (error) {
+          const errorMessage = (error.message || '').toLowerCase();
+
+          // Supabase may explicitly return an "already registered" error.
+          if (
+            errorMessage.includes('already registered') ||
+            errorMessage.includes('already exists') ||
+            errorMessage.includes('user already')
+          ) {
+            showLoginScreen(
+              'login',
+              'Account already exists. This email is already registered. Please use Forgot Password to recover your account.',
+              email
+            );
+            return;
+          }
+
+          throw error;
+        }
+
+        // With some Supabase Auth configurations, an existing email can
+        // return a user object with no identities instead of an error.
+        if (
+          data?.user &&
+          Array.isArray(data.user.identities) &&
+          data.user.identities.length === 0
+        ) {
+          showLoginScreen(
+            'login',
+            'Account already exists. This email is already registered. Please use Forgot Password to recover your account.',
+            email
+          );
+          return;
+        }
 
         if (data.session) {
           currentUser = data.user;
@@ -247,7 +286,8 @@ function showLoginScreen(mode = 'login', message = '') {
         } else {
           showLoginScreen(
             'login',
-            'Account created. Please check your email to confirm your account, then log in.'
+            'Account created. Please check your email to confirm your account, then log in.',
+            email
           );
         }
 
