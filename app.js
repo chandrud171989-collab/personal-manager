@@ -783,6 +783,8 @@ function openDocumentForm(existing) {
 function openMaintenanceForm(existing) {
   const isEdit = !!existing;
   const m = existing || { id: uid(), reminders: [30,7,1], notifiedThresholds: [] };
+  const todayDate = new Date().toISOString().split('T')[0];
+
   openModal(`
     <div class="modal-title">${isEdit ? 'Edit item' : 'Add home item'}</div>
     <form id="maintForm">
@@ -796,10 +798,12 @@ function openMaintenanceForm(existing) {
         <input type="text" name="itemName" value="${escapeHTML(m.itemName && m.type==='Other' ? m.itemName : '')}" placeholder="e.g. Water heater">
       </div>
       <div class="field"><label>Last service date</label>
-        <input type="date" name="lastServiceDate" value="${m.lastServiceDate||''}" max="${new Date().toISOString().split('T')[0]}">
+        <input type="date" name="lastServiceDate" value="${m.lastServiceDate||''}" max="${todayDate}">
+        <small>Today or a past date only.</small>
       </div>
-      <div class="field"><label>Next service date</label>
-        <input type="date" name="nextServiceDate" required min="${new Date().toISOString().split('T')[0]}" value="${m.nextServiceDate||''}"
+      <div class="field"><label>Service due date</label>
+        <input type="date" name="nextServiceDate" required min="${todayDate}" value="${m.nextServiceDate||''}">
+        <small>Today or a future date only.</small>
       </div>
       <div class="field"><label>Cost (₹)</label>
         <input type="number" name="cost" min="0" step="0.01" value="${m.cost ?? ''}" placeholder="0">
@@ -826,132 +830,84 @@ function openMaintenanceForm(existing) {
   document.getElementById('typeSelect').addEventListener('change', (e) => {
     document.getElementById('customNameField').style.display = e.target.value === 'Other' ? '' : 'none';
   });
+
   document.getElementById('cancelBtn').addEventListener('click', closeModal);
+
   if (isEdit) {
     document.getElementById('deleteBtn').addEventListener('click', async () => {
-      if (confirm('Delete this item?')) { await dbDelete('maintenance', m.id); closeModal(); render(); }
+      if (confirm('Delete this item?')) {
+        await dbDelete('maintenance', m.id);
+        closeModal();
+        render();
+      }
     });
   }
+
   document.getElementById('maintForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  const fd = new FormData(e.target);
+    const fd = new FormData(e.target);
+    const type = fd.get('type');
+    const lastServiceDate = fd.get('lastServiceDate');
+    const nextServiceDate = fd.get('nextServiceDate');
+    const cost = fd.get('cost');
+    const reminders = chips
+      .filter(c => c.classList.contains('on'))
+      .map(c => Number(c.dataset.val));
 
-  const type = fd.get('type');
-
-  const reminders = chips
-    .filter(c => c.classList.contains('on'))
-    .map(c => Number(c.dataset.val));
-
-  const lastServiceDate = fd.get('lastServiceDate');
-  const nextServiceDate = fd.get('nextServiceDate');
-  const cost = fd.get('cost');
-
-
-  // Last serviced date cannot be in the future
-  if (lastServiceDate) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const lastDate = new Date(lastServiceDate + 'T00:00:00');
+    // Last service cannot be in the future.
+    if (lastServiceDate) {
+      const lastDate = new Date(lastServiceDate + 'T00:00:00');
+      if (lastDate > today) {
+        alert('Last serviced date cannot be in the future.');
+        return;
+      }
+    }
 
-    if (lastDate > today) {
-      alert('Last serviced date cannot be in the future.');
+    // Service due date must be today or later.
+    if (nextServiceDate) {
+      const nextDate = new Date(nextServiceDate + 'T00:00:00');
+      if (nextDate < today) {
+        alert('Service due date cannot be in the past.');
+        return;
+      }
+    }
+
+    // Service due date must be after the last service date.
+    if (lastServiceDate && nextServiceDate) {
+      const lastDate = new Date(lastServiceDate + 'T00:00:00');
+      const nextDate = new Date(nextServiceDate + 'T00:00:00');
+      if (nextDate <= lastDate) {
+        alert('Service due date must be after the last serviced date.');
+        return;
+      }
+    }
+
+    if (cost && Number(cost) < 0) {
+      alert('Service cost cannot be negative.');
       return;
     }
-  }
 
-  // Next service date cannot be in the past
-  if (nextServiceDate) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const nextDate = new Date(nextServiceDate + 'T00:00:00');
-
-    if (nextDate < today) {
-      alert('Next service date cannot be in the past.');
-      return;
-    }
-  }
-  // Next service must be after last service
-  if (lastServiceDate && nextServiceDate) {
-    const lastDate = new Date(lastServiceDate + 'T00:00:00');
-    const nextDate = new Date(nextServiceDate + 'T00:00:00');
-
-    if (nextDate <= lastDate) {
-      alert('Next service date must be after the last serviced date.');
-      return;
-    }
-  }
-  // Cost cannot be negative
-  if (cost && Number(cost) < 0) {
-    alert('Service cost cannot be negative.');
-    return;
-  }
-  const record = {
-    id: m.id,
-    type,
-    itemName: type === 'Other'
-      ? (fd.get('itemName').trim() || 'Other item')
-      : type,
-
-    lastServiceDate: lastServiceDate || null,
-    nextServiceDate: nextServiceDate,
-
-    cost: cost ? Number(cost) : null,
-
-    notes: fd.get('notes').trim(),
-
-    reminders,
-
-    notifiedThresholds:
-      isEdit && existing.nextServiceDate === nextServiceDate
-        ? (m.notifiedThresholds || [])
-        : [],
-  };
-
-  await dbPut('maintenance', record);
-
-  closeModal();
-
-  render();
-});
-
-    const lastDate = new Date(lastServiceDate + 'T00:00:00');
-
-    if (lastDate > today) {
-      alert('Last serviced date cannot be in the future.');
-      return;
-    }
-  }
-
-  // Next service must be after last service
-  if (lastServiceDate && nextServiceDate) {
-    const lastDate = new Date(lastServiceDate + 'T00:00:00');
-    const nextDate = new Date(nextServiceDate + 'T00:00:00');
-
-    if (nextDate <= lastDate) {
-      alert('Next service date must be after the last serviced date.');
-      return;
-    }
-  }
-
-  // Cost cannot be negative
-  if (cost && Number(cost) < 0) {
-    alert('Service cost cannot be negative.');
-    return;
-  }
     const record = {
       id: m.id,
       type,
-      itemName: type === 'Other' ? (fd.get('itemName').trim() || 'Other item') : type,
+      itemName: type === 'Other'
+        ? (fd.get('itemName').trim() || 'Other item')
+        : type,
       lastServiceDate: lastServiceDate || null,
-      nextServiceDate: nextServiceDate,
+      nextServiceDate,
       cost: cost ? Number(cost) : null,
       notes: fd.get('notes').trim(),
       reminders,
-      notifiedThresholds: isEdit && existing.nextServiceDate === fd.get('nextServiceDate') ? (m.notifiedThresholds||[]) : [],
+      notifiedThresholds:
+        isEdit && existing.nextServiceDate === nextServiceDate
+          ? (m.notifiedThresholds || [])
+          : [],
     };
+
     await dbPut('maintenance', record);
     closeModal();
     render();
