@@ -1,6 +1,6 @@
 /* ---------------- Config ---------------- */
-const DOC_CATEGORIES = ['Insurance','ID / License','Passport','Warranty','Vehicle RC','Subscription','Property','Other'];
-const MAINT_TYPES = ['AC','RO / Water Purifier','Refrigerator','Washing Machine','Geyser','Vehicle','Other'];
+const DOC_CATEGORIES = ['Àadhar','PAN','ID /Driving License','Passport','Voter ID','Warranty','Vehicle RC','Subscription','Property','Education Certificate','Other'];
+const MAINT_TYPES = ['AC','RO / Water Purifier','Refrigerator','Washing Machine','Geyser','Vehicle Service','Home Cleaning','Pest Control','Electrical/Plumbing','Other'];
 const REMINDER_OPTIONS = [30,7,1];
 
 let state = { view: 'dashboard' };
@@ -966,7 +966,7 @@ async function checkReminders() {
     const notified = m.notifiedThresholds || [];
     for (const t of reminders) {
       if (days <= t && !notified.includes(t)) {
-        await notify('Maintenance due', `${m.itemName} service due ${fmtDate(m.nextServiceDate)} (${daysLabel(days)}).`, `maint-${m.id}-${t}`);
+        await notify('Maintenance due', `${m.itemName} Maintenance ${fmtDate(m.nextServiceDate)} (${daysLabel(days)}).`, `maint-${m.id}-${t}`);
         notified.push(t);
       }
     }
