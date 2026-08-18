@@ -796,7 +796,7 @@ function openMaintenanceForm(existing) {
         <input type="text" name="itemName" value="${escapeHTML(m.itemName && m.type==='Other' ? m.itemName : '')}" placeholder="e.g. Water heater">
       </div>
       <div class="field"><label>Last service date</label>
-        <input type="date" name="lastServiceDate" value="${m.lastServiceDate||''}">
+        <input type="date" name="lastServiceDate" value="${m.lastServiceDate||''}" max="${new Date().toISOString().split('T')[0]}">
       </div>
       <div class="field"><label>Next service date</label>
         <input type="date" name="nextServiceDate" required value="${m.nextServiceDate||''}">
@@ -837,13 +837,46 @@ function openMaintenanceForm(existing) {
     const fd = new FormData(e.target);
     const type = fd.get('type');
     const reminders = chips.filter(c => c.classList.contains('on')).map(c => Number(c.dataset.val));
+      const lastServiceDate = fd.get('lastServiceDate');
+  const nextServiceDate = fd.get('nextServiceDate');
+  const cost = fd.get('cost');
+
+  // Last service cannot be in the future
+  if (lastServiceDate) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const lastDate = new Date(lastServiceDate + 'T00:00:00');
+
+    if (lastDate > today) {
+      alert('Last serviced date cannot be in the future.');
+      return;
+    }
+  }
+
+  // Next service must be after last service
+  if (lastServiceDate && nextServiceDate) {
+    const lastDate = new Date(lastServiceDate + 'T00:00:00');
+    const nextDate = new Date(nextServiceDate + 'T00:00:00');
+
+    if (nextDate <= lastDate) {
+      alert('Next service date must be after the last serviced date.');
+      return;
+    }
+  }
+
+  // Cost cannot be negative
+  if (cost && Number(cost) < 0) {
+    alert('Service cost cannot be negative.');
+    return;
+  }
     const record = {
       id: m.id,
       type,
       itemName: type === 'Other' ? (fd.get('itemName').trim() || 'Other item') : type,
-      lastServiceDate: fd.get('lastServiceDate') || null,
-      nextServiceDate: fd.get('nextServiceDate'),
-      cost: fd.get('cost') ? Number(fd.get('cost')) : null,
+      lastServiceDate: lastServiceDate || null,
+      nextServiceDate: nextServiceDate,
+      cost: cost ? Number(cost) : null,
       notes: fd.get('notes').trim(),
       reminders,
       notifiedThresholds: isEdit && existing.nextServiceDate === fd.get('nextServiceDate') ? (m.notifiedThresholds||[]) : [],
