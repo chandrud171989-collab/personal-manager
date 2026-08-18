@@ -95,6 +95,7 @@ async function render() {
   if (state.view === 'dashboard') return renderDashboard();
   if (state.view === 'documents') return renderDocuments();
   if (state.view === 'maintenance') return renderMaintenance();
+  if (state.view === 'finance') return renderFinance();
 }
 
 async function renderDashboard() {
@@ -193,6 +194,350 @@ async function renderMaintenance() {
       ${items.length ? items.map(m => cardHTML({...m, _kind:'maintenance'})).join('') : emptyHTML('No items yet. Tap + to add one.')}
     </div>
   `;
+  /* ---------------- Finance ---------------- */
+
+function renderFinance() {
+  viewEl.innerHTML = `
+    <div class="finance-page">
+
+      <div class="finance-header">
+        <h1>Salary & Finance</h1>
+        <p>Manage your salary, loans and EMIs</p>
+      </div>
+
+      <!-- Salary Calculator -->
+      <div class="finance-card">
+
+        <h2>💼 Salary Calculator</h2>
+
+        <div class="field">
+          <label>Annual CTC (₹)</label>
+          <input
+            type="number"
+            id="financeCTC"
+            placeholder="Example: 1500000"
+          >
+        </div>
+
+        <div class="field">
+          <label>Variable Pay / Year (₹)</label>
+          <input
+            type="number"
+            id="financeVariable"
+            placeholder="Example: 150000"
+          >
+        </div>
+
+        <div class="field">
+          <label>PF / Month (₹)</label>
+          <input
+            type="number"
+            id="financePF"
+            placeholder="Example: 1800"
+          >
+        </div>
+
+        <button
+          type="button"
+          class="btn primary finance-calculate"
+          id="calculateSalaryBtn">
+          Calculate Salary
+        </button>
+
+        <div id="salaryResult"></div>
+
+      </div>
+
+
+      <!-- EMI Calculator -->
+      <div class="finance-card">
+
+        <h2>🏦 EMI Calculator</h2>
+
+        <div class="field">
+          <label>Loan Amount (₹)</label>
+          <input
+            type="number"
+            id="financeLoan"
+            placeholder="Example: 1000000"
+          >
+        </div>
+
+        <div class="field">
+          <label>Interest Rate (% per year)</label>
+          <input
+            type="number"
+            id="financeInterest"
+            step="0.01"
+            placeholder="Example: 8.5"
+          >
+        </div>
+
+        <div class="field">
+          <label>Loan Tenure (Years)</label>
+          <input
+            type="number"
+            id="financeYears"
+            placeholder="Example: 5"
+          >
+        </div>
+
+        <button
+          type="button"
+          class="btn primary finance-calculate"
+          id="calculateEMIBtn">
+          Calculate EMI
+        </button>
+
+        <div id="emiResult"></div>
+
+      </div>
+
+
+      <!-- Loan Summary -->
+      <div class="finance-card">
+
+        <h2>📊 Monthly Loan Summary</h2>
+
+        <div class="field">
+          <label>Home Loan EMI (₹)</label>
+          <input
+            type="number"
+            id="homeLoanEMI"
+            placeholder="Example: 47000"
+          >
+        </div>
+
+        <div class="field">
+          <label>Personal Loan EMI (₹)</label>
+          <input
+            type="number"
+            id="personalLoanEMI"
+            placeholder="Example: 22000"
+          >
+        </div>
+
+        <div class="field">
+          <label>Car Loan EMI (₹)</label>
+          <input
+            type="number"
+            id="carLoanEMI"
+            placeholder="Example: 31000"
+          >
+        </div>
+
+        <button
+          type="button"
+          class="btn primary finance-calculate"
+          id="calculateLoanBtn">
+          Calculate Total EMI
+        </button>
+
+        <div id="loanTotalResult"></div>
+
+      </div>
+
+    </div>
+  `;
+
+  bindFinanceEvents();
+}
+
+
+/* ---------------- Finance Events ---------------- */
+
+function bindFinanceEvents() {
+
+  document
+    .getElementById('calculateSalaryBtn')
+    .addEventListener('click', calculateSalary);
+
+  document
+    .getElementById('calculateEMIBtn')
+    .addEventListener('click', calculateEMI);
+
+  document
+    .getElementById('calculateLoanBtn')
+    .addEventListener('click', calculateLoanTotal);
+}
+
+
+/* ---------------- Salary Calculator ---------------- */
+
+function calculateSalary() {
+
+  const ctc =
+    Number(document.getElementById('financeCTC').value) || 0;
+
+  const variable =
+    Number(document.getElementById('financeVariable').value) || 0;
+
+  const pf =
+    Number(document.getElementById('financePF').value) || 0;
+
+  if (ctc <= 0) {
+    alert('Please enter your annual CTC.');
+    return;
+  }
+
+  if (variable > ctc) {
+    alert('Variable pay cannot be greater than CTC.');
+    return;
+  }
+
+  const fixedCTC = ctc - variable;
+
+  const monthlyCTC = ctc / 12;
+
+  const monthlyFixed = fixedCTC / 12;
+
+  const monthlyVariable = variable / 12;
+
+  const estimatedSalary = monthlyFixed - pf;
+
+  document.getElementById('salaryResult').innerHTML = `
+
+    <div class="finance-result">
+
+      <div class="finance-result-row">
+        <span>Annual CTC</span>
+        <strong>₹${formatFinanceMoney(ctc)}</strong>
+      </div>
+
+      <div class="finance-result-row">
+        <span>Fixed CTC</span>
+        <strong>₹${formatFinanceMoney(fixedCTC)}</strong>
+      </div>
+
+      <div class="finance-result-row">
+        <span>Monthly CTC</span>
+        <strong>₹${formatFinanceMoney(monthlyCTC)}</strong>
+      </div>
+
+      <div class="finance-result-row">
+        <span>Monthly Variable</span>
+        <strong>₹${formatFinanceMoney(monthlyVariable)}</strong>
+      </div>
+
+      <div class="finance-result-row finance-highlight">
+        <span>Estimated Monthly Salary*</span>
+        <strong>₹${formatFinanceMoney(estimatedSalary)}</strong>
+      </div>
+
+    </div>
+
+    <div class="finance-note">
+      *Approximate calculation before income tax and other deductions.
+    </div>
+  `;
+}
+
+
+/* ---------------- EMI Calculator ---------------- */
+
+function calculateEMI() {
+
+  const principal =
+    Number(document.getElementById('financeLoan').value) || 0;
+
+  const annualRate =
+    Number(document.getElementById('financeInterest').value) || 0;
+
+  const years =
+    Number(document.getElementById('financeYears').value) || 0;
+
+  if (principal <= 0 || annualRate <= 0 || years <= 0) {
+    alert('Please enter all loan details.');
+    return;
+  }
+
+  const monthlyRate = annualRate / 12 / 100;
+
+  const months = years * 12;
+
+  const emi =
+    principal *
+    monthlyRate *
+    Math.pow(1 + monthlyRate, months) /
+    (Math.pow(1 + monthlyRate, months) - 1);
+
+  const totalPayment = emi * months;
+
+  const totalInterest = totalPayment - principal;
+
+  document.getElementById('emiResult').innerHTML = `
+
+    <div class="finance-result">
+
+      <div class="finance-result-row finance-highlight">
+        <span>Monthly EMI</span>
+        <strong>₹${formatFinanceMoney(emi)}</strong>
+      </div>
+
+      <div class="finance-result-row">
+        <span>Total Interest</span>
+        <strong>₹${formatFinanceMoney(totalInterest)}</strong>
+      </div>
+
+      <div class="finance-result-row">
+        <span>Total Payment</span>
+        <strong>₹${formatFinanceMoney(totalPayment)}</strong>
+      </div>
+
+    </div>
+  `;
+}
+
+
+/* ---------------- Loan Summary ---------------- */
+
+function calculateLoanTotal() {
+
+  const home =
+    Number(document.getElementById('homeLoanEMI').value) || 0;
+
+  const personal =
+    Number(document.getElementById('personalLoanEMI').value) || 0;
+
+  const car =
+    Number(document.getElementById('carLoanEMI').value) || 0;
+
+  const total = home + personal + car;
+
+  document.getElementById('loanTotalResult').innerHTML = `
+
+    <div class="finance-result">
+
+      <div class="finance-result-row">
+        <span>Home Loan</span>
+        <strong>₹${formatFinanceMoney(home)}</strong>
+      </div>
+
+      <div class="finance-result-row">
+        <span>Personal Loan</span>
+        <strong>₹${formatFinanceMoney(personal)}</strong>
+      </div>
+
+      <div class="finance-result-row">
+        <span>Car Loan</span>
+        <strong>₹${formatFinanceMoney(car)}</strong>
+      </div>
+
+      <div class="finance-result-row finance-highlight">
+        <span>Total Monthly EMI</span>
+        <strong>₹${formatFinanceMoney(total)}</strong>
+      </div>
+
+    </div>
+  `;
+}
+
+
+/* ---------------- Finance Number Format ---------------- */
+
+function formatFinanceMoney(value) {
+  return Math.round(value).toLocaleString('en-IN');
+}
   bindCardClicks();
 }
 

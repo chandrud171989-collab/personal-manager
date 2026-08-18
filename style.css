@@ -280,3 +280,92 @@ button{font-family:inherit;}
 .detail-photo{width:100%;border-radius:12px;margin-top:10px;display:block;}
 
 .hidden{display:none !important;}
+/* ================================
+   FINANCE
+   ================================ */
+
+.finance-page {
+  padding: 8px 0 100px;
+}
+
+.finance-header {
+  margin-bottom: 18px;
+}
+
+.finance-header h1 {
+  margin: 0;
+  font-size: 26px;
+}
+
+.finance-header p {
+  margin: 5px 0 0;
+  color: var(--muted);
+}
+
+
+.finance-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 18px;
+  margin-bottom: 16px;
+}
+
+
+.finance-card h2 {
+  margin: 0 0 16px;
+  font-size: 18px;
+}
+
+
+.finance-card .field {
+  margin-bottom: 14px;
+}
+
+
+.finance-card input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+
+.finance-calculate {
+  width: 100%;
+  margin-top: 4px;
+}
+
+
+.finance-result {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+
+.finance-result-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+
+.finance-result-row:last-child {
+  border-bottom: none;
+}
+
+
+.finance-highlight {
+  font-weight: 700;
+  font-size: 16px;
+}
+
+
+.finance-note {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
