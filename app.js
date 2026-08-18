@@ -208,48 +208,114 @@ function renderFinance() {
         <p>Manage your salary, loans and EMIs</p>
       </div>
 
-      <!-- Salary Calculator -->
-      <div class="finance-card">
+<!-- Salary Calculator -->
+<div class="finance-card">
 
-        <h2>💼 Salary Calculator</h2>
+  <h2>💼 Salary Calculator</h2>
 
-        <div class="field">
-          <label>Annual CTC (₹)</label>
-          <input
-            type="number"
-            id="financeCTC"
-            placeholder="Example: 1500000"
-          >
-        </div>
+  <div class="finance-section-title">
+    Salary Components
+  </div>
 
-        <div class="field">
-          <label>Variable Pay / Year (₹)</label>
-          <input
-            type="number"
-            id="financeVariable"
-            placeholder="Example: 150000"
-          >
-        </div>
+  <div class="field">
+    <label>Annual CTC (₹)</label>
+    <input
+      type="number"
+      id="financeCTC"
+      min="0"
+      placeholder="Example: 1500000">
+  </div>
 
-        <div class="field">
-          <label>PF / Month (₹)</label>
-          <input
-            type="number"
-            id="financePF"
-            placeholder="Example: 1800"
-          >
-        </div>
+  <div class="field">
+    <label>Basic Salary / Year (₹)</label>
+    <input
+      type="number"
+      id="financeBasic"
+      min="0"
+      placeholder="Example: 600000">
+  </div>
 
-        <button
-          type="button"
-          class="btn primary finance-calculate"
-          id="calculateSalaryBtn">
-          Calculate Salary
-        </button>
+  <div class="field">
+    <label>HRA / Year (₹)</label>
+    <input
+      type="number"
+      id="financeHRA"
+      min="0"
+      placeholder="Example: 300000">
+  </div>
 
-        <div id="salaryResult"></div>
+  <div class="field">
+    <label>Other Allowances / Year (₹)</label>
+    <input
+      type="number"
+      id="financeAllowance"
+      min="0"
+      placeholder="Example: 450000">
+  </div>
 
-      </div>
+  <div class="field">
+    <label>Variable Pay / Year (₹)</label>
+    <input
+      type="number"
+      id="financeVariable"
+      min="0"
+      placeholder="Example: 150000">
+  </div>
+
+
+  <div class="finance-section-title">
+    Employee Deductions
+  </div>
+
+  <div class="field">
+    <label>Employee PF / Month (₹)</label>
+    <input
+      type="number"
+      id="financePF"
+      min="0"
+      placeholder="Example: 1800">
+  </div>
+
+  <div class="field">
+    <label>Professional Tax / Month (₹)</label>
+    <input
+      type="number"
+      id="financePT"
+      min="0"
+      placeholder="Example: 200">
+  </div>
+
+  <div class="field">
+    <label>TDS / Income Tax / Month (₹)</label>
+    <input
+      type="number"
+      id="financeTDS"
+      min="0"
+      placeholder="Example: 5000">
+  </div>
+
+  <div class="field">
+    <label>Other Deductions / Month (₹)</label>
+    <input
+      type="number"
+      id="financeOtherDeduction"
+      min="0"
+      placeholder="Example: 500">
+  </div>
+
+
+  <button
+    type="button"
+    class="btn primary finance-calculate"
+    id="calculateSalaryBtn">
+
+    Calculate Salary
+
+  </button>
+
+  <div id="salaryResult"></div>
+
+</div>
 
 
       <!-- EMI Calculator -->
@@ -372,14 +438,35 @@ function calculateSalary() {
   const ctc =
     Number(document.getElementById('financeCTC').value) || 0;
 
+  const basic =
+    Number(document.getElementById('financeBasic').value) || 0;
+
+  const hra =
+    Number(document.getElementById('financeHRA').value) || 0;
+
+  const allowance =
+    Number(document.getElementById('financeAllowance').value) || 0;
+
   const variable =
     Number(document.getElementById('financeVariable').value) || 0;
 
   const pf =
     Number(document.getElementById('financePF').value) || 0;
 
+  const professionalTax =
+    Number(document.getElementById('financePT').value) || 0;
+
+  const tds =
+    Number(document.getElementById('financeTDS').value) || 0;
+
+  const otherDeduction =
+    Number(document.getElementById('financeOtherDeduction').value) || 0;
+
+
+  /* Validation */
+
   if (ctc <= 0) {
-    alert('Please enter your annual CTC.');
+    alert('Please enter your Annual CTC.');
     return;
   }
 
@@ -392,15 +479,30 @@ function calculateSalary() {
 
   const monthlyCTC = ctc / 12;
 
-  const monthlyFixed = fixedCTC / 12;
+  const monthlyFixedGross = fixedCTC / 12;
 
   const monthlyVariable = variable / 12;
 
-  const estimatedSalary = monthlyFixed - pf;
+  const totalMonthlyDeductions =
+    pf +
+    professionalTax +
+    tds +
+    otherDeduction;
+
+  const estimatedTakeHome =
+    monthlyFixedGross -
+    totalMonthlyDeductions;
+
+
+  /* Display Results */
 
   document.getElementById('salaryResult').innerHTML = `
 
     <div class="finance-result">
+
+      <div class="finance-result-heading">
+        Salary Summary
+      </div>
 
       <div class="finance-result-row">
         <span>Annual CTC</span>
@@ -413,25 +515,63 @@ function calculateSalary() {
       </div>
 
       <div class="finance-result-row">
+        <span>Variable Pay</span>
+        <strong>₹${formatFinanceMoney(variable)}</strong>
+      </div>
+
+      <div class="finance-result-row">
         <span>Monthly CTC</span>
         <strong>₹${formatFinanceMoney(monthlyCTC)}</strong>
       </div>
 
       <div class="finance-result-row">
-        <span>Monthly Variable</span>
-        <strong>₹${formatFinanceMoney(monthlyVariable)}</strong>
+        <span>Monthly Fixed Gross</span>
+        <strong>₹${formatFinanceMoney(monthlyFixedGross)}</strong>
       </div>
 
+
+      <div class="finance-result-heading deduction-heading">
+        Monthly Deductions
+      </div>
+
+      <div class="finance-result-row">
+        <span>Employee PF</span>
+        <strong>− ₹${formatFinanceMoney(pf)}</strong>
+      </div>
+
+      <div class="finance-result-row">
+        <span>Professional Tax</span>
+        <strong>− ₹${formatFinanceMoney(professionalTax)}</strong>
+      </div>
+
+      <div class="finance-result-row">
+        <span>TDS / Income Tax</span>
+        <strong>− ₹${formatFinanceMoney(tds)}</strong>
+      </div>
+
+      <div class="finance-result-row">
+        <span>Other Deductions</span>
+        <strong>− ₹${formatFinanceMoney(otherDeduction)}</strong>
+      </div>
+
+      <div class="finance-result-row">
+        <span>Total Deductions</span>
+        <strong>− ₹${formatFinanceMoney(totalMonthlyDeductions)}</strong>
+      </div>
+
+
       <div class="finance-result-row finance-highlight">
-        <span>Estimated Monthly Salary*</span>
-        <strong>₹${formatFinanceMoney(estimatedSalary)}</strong>
+        <span>Estimated Take Home</span>
+        <strong>₹${formatFinanceMoney(estimatedTakeHome)}</strong>
       </div>
 
     </div>
 
     <div class="finance-note">
-      *Approximate calculation before income tax and other deductions.
+      This is an estimate based on the values entered.
+      Actual salary may vary based on your company's payroll structure.
     </div>
+
   `;
 }
 
