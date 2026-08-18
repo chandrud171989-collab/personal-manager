@@ -237,7 +237,23 @@ function showLoginScreen(mode = 'login', message = '') {
           }
         });
 
-        if (error) throw error;
+        if (error) {
+          const msg = (error.message || '').toLowerCase();
+
+          if (
+            msg.includes('already registered') ||
+            msg.includes('already exists') ||
+            msg.includes('user already')
+          ) {
+            showLoginScreen(
+              'login',
+              'Account already exists. Please use Login or Forgot Password to recover your account.'
+            );
+            return;
+          }
+
+          throw error;
+        }
 
         if (data.session) {
           currentUser = data.user;
