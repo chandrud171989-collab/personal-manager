@@ -187,10 +187,6 @@ function showLoginScreen(mode = 'login', message = '') {
             Create Account
           </button>
         ` : `
-          <button type="button" class="btn" id="registerForgotPasswordBtn">
-            Forgot Password?
-          </button>
-
           <div style="opacity:.7;font-size:14px;">
             Already have an account?
           </div>
@@ -231,48 +227,21 @@ function showLoginScreen(mode = 'login', message = '') {
           throw new Error('Passwords do not match.');
         }
 
+        const redirectTo =
+          window.location.origin + window.location.pathname;
+
         const { data, error } = await client.auth.signUp({
           email,
           password,
           options: {
+            emailRedirectTo: redirectTo,
             data: {
               full_name: name
             }
           }
         });
 
-        if (error) {
-          const msg = (error.message || '').toLowerCase();
-
-          if (
-            msg.includes('already registered') ||
-            msg.includes('already exists') ||
-            msg.includes('user already')
-          ) {
-            showLoginScreen(
-              'register',
-              'Account already exists. This email is already registered. Please use Forgot Password to recover your account.'
-            );
-            return;
-          }
-
-          throw error;
-        }
-
-        // When Supabase email confirmation is enabled, an existing confirmed
-        // account may return an obfuscated user with no identities instead
-        // of returning "User already registered".
-        if (
-          data?.user &&
-          Array.isArray(data.user.identities) &&
-          data.user.identities.length === 0
-        ) {
-          showLoginScreen(
-            'register',
-            'Account already exists. This email is already registered. Please use Forgot Password to recover your account.'
-          );
-          return;
-        }
+        if (error) throw error;
 
         if (data.session) {
           currentUser = data.user;
@@ -343,36 +312,6 @@ function showLoginScreen(mode = 'login', message = '') {
   } else {
     document.getElementById('showLoginBtn').addEventListener('click', () => {
       showLoginScreen('login');
-    });
-
-    document.getElementById('registerForgotPasswordBtn').addEventListener('click', async () => {
-      const client = getSupabaseClient();
-
-      if (!client) {
-        alert('Supabase is not configured. Please check supabase-config.js.');
-        return;
-      }
-
-      const email = document.getElementById('authEmail').value.trim();
-
-      if (!email) {
-        alert('Enter your email address first.');
-        return;
-      }
-
-      try {
-        const redirectTo = window.location.origin + window.location.pathname;
-
-        const { error } = await client.auth.resetPasswordForEmail(email, {
-          redirectTo
-        });
-
-        if (error) throw error;
-
-        alert('Password reset email sent. Please check your inbox.');
-      } catch (error) {
-        alert(error.message || 'Unable to send password reset email.');
-      }
     });
   }
 }
