@@ -1204,7 +1204,7 @@ function openDocumentForm(existing) {
       </div>
 
       <div class="modal-actions">
-        ${isEdit ? '<button type="button" class="btn danger" id="deleteBtn">Delete Document</button>' : ''}
+        ${isEdit ? '<button type="button" class="btn danger" id="deleteBtn">Delete Entry</button>' : ''}
         <button type="button" class="btn" id="cancelBtn">Cancel</button>
         <button type="submit" class="btn primary" id="saveDocBtn">Save</button>
       </div>
