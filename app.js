@@ -199,11 +199,12 @@ async function renderMaintenance() {
   `;
 
   bindCardClicks();
+  document.getElementById('viewExpenseBtn')?.addEventListener('click', renderMaintenanceExpenseSummary);
+  document.getElementById('expenseFromDate')?.addEventListener('change', renderMaintenanceExpenseSummary);
+  document.getElementById('expenseToDate')?.addEventListener('change', renderMaintenanceExpenseSummary);
 
-  document.getElementById('viewExpenseBtn')?.addEventListener(
-    'click',
-    renderMaintenanceExpenseSummary
-  );
+  // Show the summary immediately using the existing maintenance costs.
+  await renderMaintenanceExpenseSummary();
 }
 
 /* ---------------- Finance ---------------- */
@@ -1064,20 +1065,63 @@ async function renderMaintenanceExpenseSummary() {
     return;
   }
 
-  container.innerHTML = '<div class="empty">Loading expenses...</div>';
-
   try {
-    const rows = await getMaintenanceExpenses(fromDate, toDate);
+    // Primary source for this app: the customer's local maintenance records.
+    // Cost is treated as an expense on the last-service date.
+    const maintenance = await dbGetAll('maintenance');
+    let rows = maintenance
+      .filter(m => Number.isFinite(Number(m.cost)) && Number(m.cost) > 0 && m.lastServiceDate)
+      .map(m => ({
+        service_date: m.lastServiceDate,
+        item_name: m.itemName || m.type || 'Other item',
+        amount: Number(m.cost),
+        notes: m.notes || ''
+      }));
+
+    // If Supabase has explicit expense rows, prefer those because they can
+    // contain multiple expenses for the same maintenance item.
+    if (window.supabaseClient) {
+      try {
+        const userId = await getExpenseUserId();
+        if (userId) {
+          let q = window.supabaseClient
+            .from('maintenance_expenses')
+            .select('id,maintenance_id,item_name,service_date,amount,notes,created_at')
+            .eq('user_id', userId)
+            .order('service_date', { ascending: false });
+          if (fromDate) q = q.gte('service_date', fromDate);
+          if (toDate) q = q.lte('service_date', toDate);
+          const result = await q;
+          if (!result.error && Array.isArray(result.data) && result.data.length) {
+            rows = result.data.map(r => ({
+              service_date: r.service_date,
+              item_name: r.item_name || 'Other item',
+              amount: Number(r.amount || 0),
+              notes: r.notes || ''
+            })).filter(r => r.amount > 0);
+          }
+        }
+      } catch (e) {
+        console.warn('Using local maintenance costs for expense summary:', e);
+      }
+    }
+
+    rows = rows.filter(row => {
+      if (!row.service_date) return false;
+      if (fromDate && row.service_date < fromDate) return false;
+      if (toDate && row.service_date > toDate) return false;
+      return true;
+    }).sort((a,b) => String(b.service_date).localeCompare(String(a.service_date)));
+
     const total = rows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
     const byItem = {};
-
     rows.forEach(row => {
       const item = row.item_name || 'Other item';
       byItem[item] = (byItem[item] || 0) + Number(row.amount || 0);
     });
 
     const itemRows = Object.entries(byItem)
-      .sort((a, b) => b[1] - a[1])
+      .sort((a,b) => b[1] - a[1])
       .map(([item, amount]) => `
         <div class="finance-result-row">
           <span>${escapeHTML(item)}</span>
@@ -1085,44 +1129,29 @@ async function renderMaintenanceExpenseSummary() {
         </div>
       `).join('');
 
-    const detailRows = rows.length
-      ? rows.map(row => `
-          <div class="detail-row">
-            <span>
-              ${fmtDate(row.service_date)}
-              · ${escapeHTML(row.item_name || 'Other item')}
-            </span>
-            <strong>₹${formatExpenseAmount(row.amount)}</strong>
-          </div>
-          ${row.notes ? `
-            <div class="detail-row">
-              <span class="k">Notes</span>
-              <span>${escapeHTML(row.notes)}</span>
-            </div>` : ''}
-        `).join('')
-      : '<div class="empty">No expenses found for this period.</div>';
+    const detailRows = rows.length ? rows.map(row => `
+      <div class="detail-row">
+        <span>${fmtDate(row.service_date)} · ${escapeHTML(row.item_name || 'Other item')}</span>
+        <strong>₹${formatExpenseAmount(row.amount)}</strong>
+      </div>
+      ${row.notes ? `<div class="detail-row"><span class="k">Notes</span><span style="text-align:right;max-width:65%">${escapeHTML(row.notes)}</span></div>` : ''}
+    `).join('') : '<div class="empty">No expenses found for this period.</div>';
 
     container.innerHTML = `
-      <div class="finance-result">
-        <div class="finance-result-row finance-highlight">
-          <span>Total Expenses</span>
-          <strong>₹${formatExpenseAmount(total)}</strong>
-        </div>
+      <div style="padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--surface);margin-bottom:14px;">
+        <div style="font-size:14px;color:var(--text-dim);margin-bottom:6px;">TOTAL EXPENSES</div>
+        <div style="font-size:28px;font-weight:800;color:var(--teal);">₹${formatExpenseAmount(total)}</div>
+        <div style="font-size:13px;color:var(--text-dim);margin-top:5px;">${rows.length} expense record${rows.length === 1 ? '' : 's'}</div>
       </div>
 
       ${itemRows ? `
-        <div class="section">
-          <div class="section-head">
-            <span class="section-title">Expense by Item</span>
-          </div>
+        <div style="margin-bottom:14px;">
+          <div class="section-head"><span class="section-title">Expense by Item</span></div>
           <div class="finance-result">${itemRows}</div>
         </div>` : ''}
 
-      <div class="section">
-        <div class="section-head">
-          <span class="section-title">Expense Details</span>
-          <span class="section-count">${rows.length}</span>
-        </div>
+      <div>
+        <div class="section-head"><span class="section-title">Expense Details</span><span class="section-count">${rows.length}</span></div>
         ${detailRows}
       </div>
     `;
@@ -1130,56 +1159,39 @@ async function renderMaintenanceExpenseSummary() {
     const downloadBtn = document.getElementById('downloadExpenseBtn');
     if (downloadBtn) {
       downloadBtn.disabled = rows.length === 0;
-      downloadBtn.onclick = () => {
-        if (rows.length) {
-          downloadMaintenanceExpensesXLS(
-            rows, byItem, total, fromDate, toDate
-          );
-        }
-      };
+      downloadBtn.onclick = () => rows.length && downloadMaintenanceExpensesXLS(rows, byItem, total, fromDate, toDate);
     }
   } catch (error) {
     console.error(error);
-    container.innerHTML = `
-      <div class="empty">
-        Unable to load expenses.
-        ${escapeHTML(error.message || String(error))}
-      </div>
-    `;
+    container.innerHTML = `<div class="empty">Unable to load expenses. ${escapeHTML(error.message || error)}</div>`;
   }
 }
 
 function maintenanceExpenseSummaryHTML() {
   return `
-    <div class="section maintenance-expense-summary">
+    <div class="section maintenance-expense-summary" style="margin-top:18px;padding-bottom:30px;">
       <div class="section-head">
-        <span class="section-title">Expense Summary</span>
+        <span class="section-title">Maintenance Expense Summary</span>
       </div>
 
-      <div class="field">
-        <label>From date</label>
-        <input type="date" id="expenseFromDate">
-      </div>
-
-      <div class="field">
-        <label>To date</label>
-        <input type="date" id="expenseToDate">
-      </div>
-
-      <div class="modal-actions">
-        <button type="button" class="btn primary" id="viewExpenseBtn">
-          View Expenses
-        </button>
-
-        <button type="button" class="btn" id="downloadExpenseBtn" disabled>
-          Download Excel
-        </button>
-      </div>
-
-      <div id="maintenanceExpenseResults">
-        <div class="empty">
-          Select a date range and tap View Expenses.
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="field">
+          <label>From date</label>
+          <input type="date" id="expenseFromDate">
         </div>
+        <div class="field">
+          <label>To date</label>
+          <input type="date" id="expenseToDate">
+        </div>
+      </div>
+
+      <div class="modal-actions" style="margin-top:4px;">
+        <button type="button" class="btn primary" id="viewExpenseBtn">View Expenses</button>
+        <button type="button" class="btn" id="downloadExpenseBtn" disabled>Download Excel (.xls)</button>
+      </div>
+
+      <div id="maintenanceExpenseResults" style="margin-top:16px;">
+        <div class="empty">Loading expense summary...</div>
       </div>
     </div>
   `;
