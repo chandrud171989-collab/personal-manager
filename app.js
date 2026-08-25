@@ -6,375 +6,20 @@ const REMINDER_OPTIONS = [30,7,1];
 let state = { view: 'dashboard' };
 
 
-/* ---------------- Supabase Authentication ---------------- */
+/* ---------------- Local-only mode ----------------
+   Supabase authentication is disabled for now.
+   Data is stored locally in this browser using IndexedDB.
+---------------------------------------------------- */
+let currentUser = { local: true };
 
-let currentUser = null;
-let authReady = false;
-
-function getSupabaseClient() {
-  if (typeof supabaseClient === 'undefined' || !supabaseClient) {
-    return null;
-  }
-  return supabaseClient;
-}
-
-function updateAuthUI(user) {
+function updateAuthUI() {
   const bottomNav = document.querySelector('.bottomnav');
-  if (bottomNav) {
-    bottomNav.style.display = user ? '' : 'none';
-  }
+  if (bottomNav) bottomNav.style.display = '';
 
   if (fab) {
-    fab.classList.toggle('hidden', !user || state.view === 'dashboard');
-  }
-
-  let logoutBtn = document.getElementById('logoutBtn');
-
-  if (user) {
-    if (!logoutBtn) {
-      logoutBtn = document.createElement('button');
-      logoutBtn.id = 'logoutBtn';
-      logoutBtn.className = 'icon-btn';
-      logoutBtn.title = 'Logout';
-      logoutBtn.setAttribute('aria-label', 'Logout');
-      logoutBtn.innerHTML = `
-        <svg viewBox="0 0 24 24" width="20" height="20">
-          <path fill="currentColor"
-            d="M10 17l5-5-5-5v3H3v4h7v3zm8-15H6c-1.1 0-2 .9-2 2v4h2V4h12v16H6v-4H4v4c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
-        </svg>
-      `;
-      const notifButton = document.getElementById('notifPermBtn');
-      if (notifButton && notifButton.parentElement) {
-        notifButton.parentElement.insertBefore(logoutBtn, notifButton);
-      }
-      logoutBtn.addEventListener('click', logoutUser);
-    }
-    logoutBtn.style.display = '';
-  } else if (logoutBtn) {
-    logoutBtn.style.display = 'none';
+    fab.classList.toggle('hidden', state.view === 'dashboard');
   }
 }
-
-function showLoginScreen(mode = 'login', message = '') {
-  authReady = true;
-  currentUser = null;
-
-  updateAuthUI(null);
-
-  const isRegister = mode === 'register';
-
-  viewEl.innerHTML = `
-    <div class="auth-page" style="
-      max-width:420px;
-      margin:40px auto;
-      padding:28px 20px 100px;
-    ">
-      <div style="
-        text-align:center;
-        margin-bottom:28px;
-      ">
-        <div style="
-          width:54px;
-          height:54px;
-          margin:0 auto 14px;
-          border-radius:16px;
-          background:#2dd4bf;
-          display:flex;
-          align-items:center;
-          justify-content:center;
-          color:#12151a;
-          font-size:28px;
-          font-weight:800;
-        ">P</div>
-
-        <h1 style="margin:0 0 8px;">Personal Manager</h1>
-        <p style="margin:0;opacity:.7;">
-          ${isRegister ? 'Create your account' : 'Welcome back'}
-        </p>
-      </div>
-
-      ${message ? `
-        <div style="
-          padding:12px 14px;
-          margin-bottom:16px;
-          border-radius:10px;
-          background:rgba(239,68,68,.12);
-          color:#fca5a5;
-          font-size:14px;
-        ">${escapeHTML(message)}</div>
-      ` : ''}
-
-      <form id="authForm">
-
-        ${isRegister ? `
-          <div class="field">
-            <label>Name</label>
-            <input
-              type="text"
-              id="authName"
-              autocomplete="name"
-              placeholder="Your name"
-              required
-            >
-          </div>
-        ` : ''}
-
-        <div class="field">
-          <label>Email</label>
-          <input
-            type="email"
-            id="authEmail"
-            autocomplete="email"
-            placeholder="you@example.com"
-            required
-          >
-        </div>
-
-        <div class="field">
-          <label>Password</label>
-          <input
-            type="password"
-            id="authPassword"
-            autocomplete="${isRegister ? 'new-password' : 'current-password'}"
-            placeholder="${isRegister ? 'At least 6 characters' : 'Your password'}"
-            minlength="6"
-            required
-          >
-        </div>
-
-        ${isRegister ? `
-          <div class="field">
-            <label>Confirm password</label>
-            <input
-              type="password"
-              id="authConfirmPassword"
-              autocomplete="new-password"
-              placeholder="Re-enter password"
-              minlength="6"
-              required
-            >
-          </div>
-        ` : ''}
-
-        <button
-          type="submit"
-          class="btn primary"
-          id="authSubmitBtn"
-          style="width:100%;margin-top:8px;"
-        >
-          ${isRegister ? 'Create Account' : 'Login'}
-        </button>
-
-      </form>
-
-      <div style="
-        text-align:center;
-        margin-top:20px;
-        display:flex;
-        flex-direction:column;
-        gap:12px;
-      ">
-        ${!isRegister ? `
-          <button type="button" class="btn" id="forgotPasswordBtn">
-            Forgot Password?
-          </button>
-
-          <div style="opacity:.7;font-size:14px;">
-            Don't have an account?
-          </div>
-
-          <button type="button" class="btn" id="showRegisterBtn">
-            Create Account
-          </button>
-        ` : `
-          <div style="opacity:.7;font-size:14px;">
-            Already have an account?
-          </div>
-
-          <button type="button" class="btn" id="showLoginBtn">
-            Back to Login
-          </button>
-        `}
-      </div>
-    </div>
-  `;
-
-  const form = document.getElementById('authForm');
-
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-
-    const client = getSupabaseClient();
-
-    if (!client) {
-      alert('Supabase is not configured. Please check supabase-config.js.');
-      return;
-    }
-
-    const email = document.getElementById('authEmail').value.trim();
-    const password = document.getElementById('authPassword').value;
-
-    const submitBtn = document.getElementById('authSubmitBtn');
-    submitBtn.disabled = true;
-    submitBtn.textContent = isRegister ? 'Creating...' : 'Logging in...';
-
-    try {
-      if (isRegister) {
-        const name = document.getElementById('authName').value.trim();
-        const confirmPassword = document.getElementById('authConfirmPassword').value;
-
-        if (password !== confirmPassword) {
-          throw new Error('Passwords do not match.');
-        }
-
-        const redirectTo =
-          window.location.origin + window.location.pathname;
-
-        const { data, error } = await client.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: redirectTo,
-            data: {
-              full_name: name
-            }
-          }
-        });
-
-        if (error) throw error;
-
-        if (data.session) {
-          currentUser = data.user;
-          state.view = 'dashboard';
-          updateAuthUI(currentUser);
-          render();
-        } else {
-          showLoginScreen(
-            'login',
-            'Account created. Please check your email to confirm your account, then log in.'
-          );
-        }
-
-      } else {
-        const { data, error } = await client.auth.signInWithPassword({
-          email,
-          password
-        });
-
-        if (error) throw error;
-
-        currentUser = data.user;
-        state.view = 'dashboard';
-        updateAuthUI(currentUser);
-        render();
-      }
-
-    } catch (error) {
-      showLoginScreen(isRegister ? 'register' : 'login', error.message || 'Unable to continue.');
-    }
-  });
-
-  if (!isRegister) {
-    document.getElementById('forgotPasswordBtn').addEventListener('click', async () => {
-      const client = getSupabaseClient();
-
-      if (!client) {
-        alert('Supabase is not configured. Please check supabase-config.js.');
-        return;
-      }
-
-      const email = document.getElementById('authEmail').value.trim();
-
-      if (!email) {
-        alert('Enter your email address first.');
-        return;
-      }
-
-      try {
-        const redirectTo = window.location.origin + window.location.pathname;
-
-        const { error } = await client.auth.resetPasswordForEmail(email, {
-          redirectTo
-        });
-
-        if (error) throw error;
-
-        alert('Password reset email sent. Please check your inbox.');
-      } catch (error) {
-        alert(error.message || 'Unable to send password reset email.');
-      }
-    });
-
-    document.getElementById('showRegisterBtn').addEventListener('click', () => {
-      showLoginScreen('register');
-    });
-
-  } else {
-    document.getElementById('showLoginBtn').addEventListener('click', () => {
-      showLoginScreen('login');
-    });
-  }
-}
-
-async function logoutUser() {
-  const client = getSupabaseClient();
-
-  if (!client) return;
-
-  const { error } = await client.auth.signOut();
-
-  if (error) {
-    alert(error.message || 'Unable to logout.');
-    return;
-  }
-
-  currentUser = null;
-  state.view = 'dashboard';
-  showLoginScreen('login');
-}
-
-async function initializeAuth() {
-  const client = getSupabaseClient();
-
-  if (!client) {
-    showLoginScreen('login', 'Supabase is not configured. Check supabase-config.js.');
-    return;
-  }
-
-  const { data, error } = await client.auth.getSession();
-
-  if (error) {
-    showLoginScreen('login', error.message);
-    return;
-  }
-
-  currentUser = data.session?.user || null;
-  authReady = true;
-
-  if (!currentUser) {
-    showLoginScreen('login');
-    return;
-  }
-
-  updateAuthUI(currentUser);
-  setView('dashboard');
-
-  client.auth.onAuthStateChange((event, session) => {
-    currentUser = session?.user || null;
-
-    if (!currentUser) {
-      state.view = 'dashboard';
-      showLoginScreen('login');
-    } else {
-      updateAuthUI(currentUser);
-      if (event === 'SIGNED_IN') {
-        state.view = 'dashboard';
-      }
-      render();
-    }
-  });
-}
-
 
 /* ---------------- IndexedDB ---------------- */
 const DB_NAME = 'personalManagerDB';
@@ -457,11 +102,6 @@ const fab = document.getElementById('fab');
 fab.classList.add('hidden');
 
 function setView(view) {
-  if (!currentUser) {
-    showLoginScreen('login');
-    return;
-  }
-
   state.view = view;
   document.querySelectorAll('.navbtn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   fab.classList.toggle('hidden', view === 'dashboard');
@@ -469,13 +109,6 @@ function setView(view) {
 }
 
 async function render() {
-  if (!currentUser) {
-    showLoginScreen('login');
-    return;
-  }
-
-  updateAuthUI(currentUser);
-
   if (state.view === 'dashboard') return renderDashboard();
   if (state.view === 'documents') return renderDocuments();
   if (state.view === 'maintenance') return renderMaintenance();
@@ -1446,13 +1079,11 @@ if ('serviceWorker' in navigator) {
 updateNotifBtn();
 
 /*
- * Start authentication first.
- * The dashboard is shown only after a valid Supabase session exists.
+ * Start the app directly in local-only mode.
+ * Supabase authentication is disabled for now.
  */
-initializeAuth();
+render();
 
 setInterval(() => {
-  if (currentUser) {
-    checkReminders();
-  }
+  checkReminders();
 }, 6 * 60 * 60 * 1000); // re-check every 6h while app is open
