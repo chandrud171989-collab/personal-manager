@@ -52,8 +52,15 @@ function updateAuthUI(user) {
       if (notifButton && notifButton.parentElement) {
         notifButton.parentElement.insertBefore(logoutBtn, notifButton);
       }
-      logoutBtn.addEventListener('click', logoutUser);
     }
+
+    // The HTML already contains #logoutBtn, so bind the handler
+    // whether the button was created dynamically or already existed.
+    if (!logoutBtn.dataset.logoutBound) {
+      logoutBtn.addEventListener('click', logoutUser);
+      logoutBtn.dataset.logoutBound = 'true';
+    }
+
     logoutBtn.style.display = '';
   } else if (logoutBtn) {
     logoutBtn.style.display = 'none';
