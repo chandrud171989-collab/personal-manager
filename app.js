@@ -169,7 +169,7 @@ function renderLoginPage(mode = 'login', message = '') {
     const client = getSupabase();
 
     if (!client) {
-      showAuthError('Supabase is not configured. Check supabase-config.js.');
+      showAuthError('Login/Create new account.');
       return;
     }
 
@@ -553,7 +553,7 @@ async function initAuth() {
   const client = getSupabase();
 
   if (!client) {
-    renderLoginPage('login', 'Supabase is not configured. Check supabase-config.js.');
+    renderLoginPage('login', 'login', 'Login/Create new account.');
     return;
   }
 
