@@ -188,13 +188,22 @@ async function renderDocuments() {
 async function renderMaintenance() {
   const items = (await dbGetAll('maintenance')).map(m => ({...m, _days: daysUntil(m.nextServiceDate)}))
     .sort((a,b) => (a._days ?? 9999) - (b._days ?? 9999));
+
   viewEl.innerHTML = `
     <div class="section" style="margin-top:8px;">
       <div class="section-head"><span class="section-title">Home items</span><span class="section-count">${items.length}</span></div>
       ${items.length ? items.map(m => cardHTML({...m, _kind:'maintenance'})).join('') : emptyHTML('No items yet. Tap + to add one.')}
     </div>
+
+    ${maintenanceExpenseSummaryHTML()}
   `;
+
   bindCardClicks();
+
+  document.getElementById('viewExpenseBtn')?.addEventListener(
+    'click',
+    renderMaintenanceExpenseSummary
+  );
 }
 
 /* ---------------- Finance ---------------- */
@@ -891,6 +900,291 @@ function openDocumentForm(existing) {
   });
 }
 
+
+/* ---------------- Maintenance Expense Summary ---------------- */
+
+/*
+ * Expense data is stored in public.maintenance_expenses.
+ * The existing maintenance table remains unchanged.
+ *
+ * Expected columns:
+ * id, user_id, maintenance_id, item_name, service_date,
+ * amount, notes, created_at, updated_at
+ */
+
+async function getExpenseUserId() {
+  if (!window.supabaseClient || !window.supabaseClient.auth) return null;
+  const { data, error } = await window.supabaseClient.auth.getUser();
+  if (error) {
+    console.warn('Unable to get Supabase user:', error);
+    return null;
+  }
+  return data?.user?.id || null;
+}
+
+async function getMaintenanceExpenses(fromDate = '', toDate = '') {
+  if (!window.supabaseClient) {
+    throw new Error('Expense storage is not configured.');
+  }
+
+  let query = window.supabaseClient
+    .from('maintenance_expenses')
+    .select('id,maintenance_id,item_name,service_date,amount,notes,created_at')
+    .order('service_date', { ascending: false });
+
+  if (fromDate) query = query.gte('service_date', fromDate);
+  if (toDate) query = query.lte('service_date', toDate);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
+}
+
+async function saveMaintenanceExpense(maintenance) {
+  if (!window.supabaseClient) return;
+
+  const userId = await getExpenseUserId();
+  if (!userId) return;
+
+  const amount = Number(maintenance.cost);
+  if (!Number.isFinite(amount) || amount <= 0) return;
+
+  const serviceDate =
+    maintenance.lastServiceDate ||
+    new Date().toISOString().slice(0, 10);
+
+  const payload = {
+    user_id: userId,
+    maintenance_id: maintenance.id,
+    item_name: maintenance.itemName || maintenance.type || 'Other item',
+    service_date: serviceDate,
+    amount,
+    notes: maintenance.notes || null,
+    updated_at: new Date().toISOString()
+  };
+
+  const { error } = await window.supabaseClient
+    .from('maintenance_expenses')
+    .upsert(payload, {
+      onConflict: 'maintenance_id,service_date'
+    });
+
+  if (error) throw error;
+}
+
+function formatExpenseAmount(value) {
+  return Number(value || 0).toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+function expenseCell(value) {
+  const text = String(value ?? '');
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+/*
+ * Creates an Excel-compatible .xls workbook using an HTML table.
+ * It opens directly in Microsoft Excel without adding another library.
+ */
+function downloadMaintenanceExpensesXLS(rows, byItem, total, fromDate, toDate) {
+  const summaryRows = Object.entries(byItem)
+    .sort((a, b) => b[1] - a[1])
+    .map(([item, amount]) => `
+      <tr>
+        <td>${escapeHTML(item)}</td>
+        <td>${Number(amount).toFixed(2)}</td>
+      </tr>
+    `).join('');
+
+  const detailRows = rows.map(row => `
+    <tr>
+      <td>${escapeHTML(row.service_date || '')}</td>
+      <td>${escapeHTML(row.item_name || 'Other item')}</td>
+      <td>${Number(row.amount || 0).toFixed(2)}</td>
+      <td>${escapeHTML(row.notes || '')}</td>
+    </tr>
+  `).join('');
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+body { font-family: Arial, sans-serif; }
+h1 { font-size: 18px; }
+h2 { font-size: 15px; margin-top: 24px; }
+table { border-collapse: collapse; margin-bottom: 18px; }
+th, td { border: 1px solid #999; padding: 7px 10px; }
+th { font-weight: bold; }
+.total { font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>Personal Manager - Maintenance Expenses</h1>
+<p>Period: ${escapeHTML(fromDate || 'All')} to ${escapeHTML(toDate || 'All')}</p>
+
+<h2>Expense Summary</h2>
+<table>
+<tr><th>Item</th><th>Total (₹)</th></tr>
+${summaryRows}
+<tr class="total"><td>Grand Total</td><td>${Number(total).toFixed(2)}</td></tr>
+</table>
+
+<h2>Expense Details</h2>
+<table>
+<tr><th>Date</th><th>Item</th><th>Amount (₹)</th><th>Notes</th></tr>
+${detailRows}
+</table>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `maintenance-expenses-${fromDate || 'all'}-to-${toDate || 'all'}.xls`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function renderMaintenanceExpenseSummary() {
+  const container = document.getElementById('maintenanceExpenseResults');
+  if (!container) return;
+
+  const fromDate = document.getElementById('expenseFromDate')?.value || '';
+  const toDate = document.getElementById('expenseToDate')?.value || '';
+
+  if (fromDate && toDate && fromDate > toDate) {
+    container.innerHTML = '<div class="empty">From date cannot be after To date.</div>';
+    return;
+  }
+
+  container.innerHTML = '<div class="empty">Loading expenses...</div>';
+
+  try {
+    const rows = await getMaintenanceExpenses(fromDate, toDate);
+    const total = rows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+    const byItem = {};
+
+    rows.forEach(row => {
+      const item = row.item_name || 'Other item';
+      byItem[item] = (byItem[item] || 0) + Number(row.amount || 0);
+    });
+
+    const itemRows = Object.entries(byItem)
+      .sort((a, b) => b[1] - a[1])
+      .map(([item, amount]) => `
+        <div class="finance-result-row">
+          <span>${escapeHTML(item)}</span>
+          <strong>₹${formatExpenseAmount(amount)}</strong>
+        </div>
+      `).join('');
+
+    const detailRows = rows.length
+      ? rows.map(row => `
+          <div class="detail-row">
+            <span>
+              ${fmtDate(row.service_date)}
+              · ${escapeHTML(row.item_name || 'Other item')}
+            </span>
+            <strong>₹${formatExpenseAmount(row.amount)}</strong>
+          </div>
+          ${row.notes ? `
+            <div class="detail-row">
+              <span class="k">Notes</span>
+              <span>${escapeHTML(row.notes)}</span>
+            </div>` : ''}
+        `).join('')
+      : '<div class="empty">No expenses found for this period.</div>';
+
+    container.innerHTML = `
+      <div class="finance-result">
+        <div class="finance-result-row finance-highlight">
+          <span>Total Expenses</span>
+          <strong>₹${formatExpenseAmount(total)}</strong>
+        </div>
+      </div>
+
+      ${itemRows ? `
+        <div class="section">
+          <div class="section-head">
+            <span class="section-title">Expense by Item</span>
+          </div>
+          <div class="finance-result">${itemRows}</div>
+        </div>` : ''}
+
+      <div class="section">
+        <div class="section-head">
+          <span class="section-title">Expense Details</span>
+          <span class="section-count">${rows.length}</span>
+        </div>
+        ${detailRows}
+      </div>
+    `;
+
+    const downloadBtn = document.getElementById('downloadExpenseBtn');
+    if (downloadBtn) {
+      downloadBtn.disabled = rows.length === 0;
+      downloadBtn.onclick = () => {
+        if (rows.length) {
+          downloadMaintenanceExpensesXLS(
+            rows, byItem, total, fromDate, toDate
+          );
+        }
+      };
+    }
+  } catch (error) {
+    console.error(error);
+    container.innerHTML = `
+      <div class="empty">
+        Unable to load expenses.
+        ${escapeHTML(error.message || String(error))}
+      </div>
+    `;
+  }
+}
+
+function maintenanceExpenseSummaryHTML() {
+  return `
+    <div class="section maintenance-expense-summary">
+      <div class="section-head">
+        <span class="section-title">Expense Summary</span>
+      </div>
+
+      <div class="field">
+        <label>From date</label>
+        <input type="date" id="expenseFromDate">
+      </div>
+
+      <div class="field">
+        <label>To date</label>
+        <input type="date" id="expenseToDate">
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn primary" id="viewExpenseBtn">
+          View Expenses
+        </button>
+
+        <button type="button" class="btn" id="downloadExpenseBtn" disabled>
+          Download Excel
+        </button>
+      </div>
+
+      <div id="maintenanceExpenseResults">
+        <div class="empty">
+          Select a date range and tap View Expenses.
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 /* ---------------- Maintenance form ---------------- */
 function openMaintenanceForm(existing) {
   const isEdit = !!existing;
@@ -972,7 +1266,12 @@ function openMaintenanceForm(existing) {
     customInput.focus();
   }
 
-  chips.forEach(chip => chip.addEventListener('click', () => selectPreset(Number(chip.dataset.val))));
+  chips.forEach(chip => chip.addEventListener('click', () => {
+    const value = Number(chip.dataset.val);
+    if (chip.classList.contains('on')) clearReminder();
+    else selectPreset(value);
+  }));
+
   customBtn.addEventListener('click', () => {
     if (customBtn.classList.contains('on')) clearReminder();
     else selectCustom();
@@ -1039,8 +1338,27 @@ function openMaintenanceForm(existing) {
       notifiedThresholds: isEdit && old.nextServiceDate === nextServiceDate ? (old.notifiedThresholds || []) : []
     };
 
-    try { await dbPut('maintenance', record); closeModal(); await render(); }
-    catch (err) { console.error(err); alert(`Could not save maintenance item: ${err.message || err}`); }
+    try {
+      await dbPut('maintenance', record);
+
+      // Mirror a positive maintenance cost into Supabase expense history
+      // when the authenticated Supabase client is available.
+      try {
+        if (record.cost && Number(record.cost) > 0) {
+          await saveMaintenanceExpense(record);
+        }
+      } catch (expenseErr) {
+        console.error('Expense history save failed:', expenseErr);
+        // Maintenance itself is already saved locally, so do not block the user.
+      }
+
+      closeModal();
+      await render();
+    }
+    catch (err) {
+      console.error(err);
+      alert(`Could not save maintenance item: ${err.message || err}`);
+    }
   });
 }
 
