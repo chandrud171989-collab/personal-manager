@@ -65,3 +65,22 @@ Document form updates:
 
 Run document_reminder_setup.sql once in Supabase SQL Editor before testing, so the selected reminder is saved per document.
 Replace the existing app.js with app.js from this folder.
+
+IMPORTANT CACHE FIX
+
+Replace these 3 files together:
+- index.html
+- app.js
+- sw.js
+
+Do not append code to app.js.
+
+After pushing to GitHub Pages:
+1. Open the site.
+2. Close all tabs for the site.
+3. Re-open it.
+4. Press Ctrl+Shift+R.
+
+The service worker is now pm-cache-v2 and app.js is versioned with a query string.
+The app shell is network-first so updated JavaScript is not stuck behind the old v1 cache.
+

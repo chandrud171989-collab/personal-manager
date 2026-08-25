@@ -1,59 +1,87 @@
-const CACHE = 'pm-cache-v1';
+const CACHE = 'pm-cache-v2';
+const APP_VERSION = '20260825-1800';
+
 const ASSETS = [
   './',
   './index.html',
   './style.css',
-  './app.js',
+  `./app.js?v=${APP_VERSION}`,
   './manifest.json',
   './icon-192.png',
   './icon-512.png'
 ];
 
-self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE).then((cache) => cache.addAll(ASSETS))
+  );
   self.skipWaiting();
 });
 
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys().then(keys => Promise.all(
-      keys.filter(k => k !== CACHE).map(k => caches.delete(k))
-    ))
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(
+        keys
+          .filter((key) => key !== CACHE)
+          .map((key) => caches.delete(key))
+      )
+    )
   );
   self.clients.claim();
 });
 
-self.addEventListener('fetch', (e) => {
-  e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request))
+self.addEventListener('fetch', (event) => {
+  const request = event.request;
+  const url = new URL(request.url);
+
+  // Always fetch the current application shell and JavaScript first.
+  // This prevents GitHub Pages/PWA from serving an old app.js.
+  const isAppShell =
+    url.pathname.endsWith('/index.html') ||
+    url.pathname.endsWith('/app.js') ||
+    url.pathname.endsWith('/style.css');
+
+  if (request.method === 'GET' && isAppShell) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE).then((cache) => cache.put(request, copy));
+          return response;
+        })
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  event.respondWith(
+    caches.match(request).then((cached) => cached || fetch(request))
   );
 });
 
-// Show a notification when told to by the app
-self.addEventListener('message', (e) => {
-  if (e.data && e.data.type === 'SHOW_NOTIFICATION') {
-    const { title, body, tag } = e.data;
-    self.registration.showNotification(title, {
-      body,
-      tag,
-      icon: './icon-192.png',
-      badge: './icon-192.png',
-      vibrate: [100, 50, 100]
-    });
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
+    const { title, body, tag } = event.data;
+    event.waitUntil(
+      self.registration.showNotification(title, {
+        body,
+        tag,
+        icon: './icon-192.png',
+        badge: './icon-192.png',
+        vibrate: [100, 50, 100]
+      })
+    );
   }
 });
 
-// Best-effort: if the browser supports periodic background sync and the
-// user granted it, check reminders even when the app isn't open.
-self.addEventListener('periodicsync', (e) => {
-  if (e.tag === 'pm-reminder-check') {
-    e.waitUntil(checkReminders());
+self.addEventListener('periodicsync', (event) => {
+  if (event.tag === 'pm-reminder-check') {
+    event.waitUntil(checkReminders());
   }
 });
 
 async function checkReminders() {
   const clientsList = await self.clients.matchAll();
-  if (clientsList.length > 0) return; // app is open, it'll handle it itself
-  // Background checks without the app open need IndexedDB access here.
-  // Kept intentionally minimal; the app performs the full check on every open.
+  if (clientsList.length > 0) return;
 }
