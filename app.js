@@ -1,9 +1,57 @@
 /* ---------------- Config ---------------- */
+const APP_BUILD = 'finance-v1.4-buttons';
 const DOC_CATEGORIES = ['Àadhar','PAN','ID /Driving License','Passport','Voter ID','Warranty','Vehicle RC','Subscription','Property','Education Certificate','Other'];
 const MAINT_TYPES = ['AC','RO / Water Purifier','Refrigerator','Washing Machine','Geyser','Vehicle Service','Home Cleaning','Pest Control','Electrical/Plumbing','Other'];
 const REMINDER_OPTIONS = [30,7,1];
 
 let state = { view: 'dashboard' };
+
+/* ---------------- Robust global click handling ---------------- */
+/*
+ * Bind these controls before authentication/rendering starts. This prevents
+ * a later rendering/runtime issue from leaving dynamically-rendered buttons
+ * without handlers. The handler is delegated so it survives re-renders.
+ */
+document.addEventListener('click', (event) => {
+  const target = event.target instanceof Element ? event.target : null;
+  if (!target) return;
+
+  const navButton = target.closest('.navbtn');
+  if (navButton) {
+    event.preventDefault();
+    event.stopPropagation();
+    const nextView = navButton.dataset.view;
+    if (nextView) setView(nextView);
+    return;
+  }
+
+  const financeAdd = target.closest('#addFinanceExpenseBtn');
+  if (financeAdd) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (currentUser && state.view === 'finance') {
+      openFinanceExpenseForm(null);
+    }
+    return;
+  }
+
+  const addButton = target.closest('#fab');
+  if (addButton) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!currentUser) return;
+    if (state.view === 'documents') openDocumentForm(null);
+    else if (state.view === 'maintenance') openMaintenanceForm(null);
+    return;
+  }
+
+  const notificationButton = target.closest('#notifPermBtn');
+  if (notificationButton) {
+    event.preventDefault();
+    event.stopPropagation();
+    requestNotifPermission();
+  }
+});
 
 
 /* ---------------- Supabase Authentication ---------------- */
@@ -1964,52 +2012,6 @@ async function checkReminders() {
     }
   }
 }
-
-/* ---------------- Wire up ---------------- */
-/*
- * Use delegated click handling for navigation, FAB and Finance Add Expense.
- * These controls are sometimes re-rendered dynamically, so binding directly
- * to the original DOM nodes is fragile. Delegation keeps all existing
- * features working after every render().
- */
-document.addEventListener('click', (event) => {
-  const target = event.target instanceof Element ? event.target : null;
-  if (!target) return;
-
-  const navButton = target.closest('.navbtn');
-  if (navButton) {
-    event.preventDefault();
-    const nextView = navButton.dataset.view;
-    if (nextView) setView(nextView);
-    return;
-  }
-
-  const financeAdd = target.closest('#addFinanceExpenseBtn');
-  if (financeAdd) {
-    event.preventDefault();
-    event.stopPropagation();
-    if (currentUser && state.view === 'finance') {
-      openFinanceExpenseForm(null);
-    }
-    return;
-  }
-
-  const addButton = target.closest('#fab');
-  if (addButton) {
-    event.preventDefault();
-    event.stopPropagation();
-    if (!currentUser) return;
-    if (state.view === 'documents') openDocumentForm(null);
-    else if (state.view === 'maintenance') openMaintenanceForm(null);
-    return;
-  }
-
-  const notificationButton = target.closest('#notifPermBtn');
-  if (notificationButton) {
-    event.preventDefault();
-    requestNotifPermission();
-  }
-});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
