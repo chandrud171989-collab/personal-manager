@@ -53,7 +53,8 @@ document.addEventListener('click', (event) => {
   }
 });
 
-
+const APP_BUILD = "finance-v1.4-buttons";
+console.log("Personal Manager:", APP_BUILD);
 /* ---------------- Supabase Authentication ---------------- */
 
 let currentUser = null;
