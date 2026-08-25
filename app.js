@@ -1258,39 +1258,8 @@ function openMaintenanceForm(existing) {
       }
 
     });
-}  const chips = Array.from(document.querySelectorAll('#reminderChipsM .chip-toggle'));
-  chips.forEach(chip => chip.addEventListener('click', () => chip.classList.toggle('on')));
-
-  document.getElementById('typeSelect').addEventListener('change', (e) => {
-    document.getElementById('customNameField').style.display = e.target.value === 'Other' ? '' : 'none';
-  });
-  document.getElementById('cancelBtn').addEventListener('click', closeModal);
-  if (isEdit) {
-    document.getElementById('deleteBtn').addEventListener('click', async () => {
-      if (confirm('Delete this item?')) { await dbDelete('maintenance', m.id); closeModal(); render(); }
-    });
-  }
-  document.getElementById('maintForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const type = fd.get('type');
-    const reminders = chips.filter(c => c.classList.contains('on')).map(c => Number(c.dataset.val));
-    const record = {
-      id: m.id,
-      type,
-      itemName: type === 'Other' ? (fd.get('itemName').trim() || 'Other item') : type,
-      lastServiceDate: fd.get('lastServiceDate') || null,
-      nextServiceDate: fd.get('nextServiceDate'),
-      cost: fd.get('cost') ? Number(fd.get('cost')) : null,
-      notes: fd.get('notes').trim(),
-      reminders,
-      notifiedThresholds: isEdit && existing.nextServiceDate === fd.get('nextServiceDate') ? (m.notifiedThresholds||[]) : [],
-    };
-    await dbPut('maintenance', record);
-    closeModal();
-    render();
-  });
 }
+
 
 /* ---------------- Detail view ---------------- */
 function openDetail(kind, item) {
