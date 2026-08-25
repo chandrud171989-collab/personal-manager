@@ -1524,3 +1524,40 @@ updateNotifBtn();
 setView('dashboard');
 checkReminders();
 setInterval(checkReminders, 6 * 60 * 60 * 1000); // re-check every 6h while app is open
+
+/* ---------------- Logout ---------------- */
+const logoutBtn = document.getElementById('logoutBtn');
+
+if (logoutBtn) {
+  logoutBtn.addEventListener('click', async () => {
+    logoutBtn.disabled = true;
+
+    try {
+      if (window.supabaseClient?.auth) {
+        const { error } = await window.supabaseClient.auth.signOut();
+        if (error) throw error;
+      }
+
+      // Reload the current app so the authentication guard/login screen
+      // can take over after the Supabase session has been removed.
+      window.location.reload();
+    } catch (error) {
+      console.error('Logout failed:', error);
+      alert(`Could not logout: ${error.message || error}`);
+      logoutBtn.disabled = false;
+    }
+  });
+}
+
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+
+updateNotifBtn();
+setView('dashboard');
+checkReminders();
+setInterval(checkReminders, 6 * 60 * 60 * 1000); // re-check every 6h while app is open
+
