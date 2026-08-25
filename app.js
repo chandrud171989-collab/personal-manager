@@ -295,19 +295,20 @@ async function logout() {
    ========================================================= */
 
 function documentToDb(doc) {
+  // Keep this mapping exactly aligned with public.documents:
+  // id, user_id, category, name, issue_date, expiry_date, notes,
+  // file_path, created_at, updated_at, file_name, file_type, file_size
   return {
     id: doc.id,
     user_id: currentUser.id,
-    document_name: doc.name || '',
-    document_type: doc.category || 'Other',
-    document_number: doc.documentNumber || null,
+    category: doc.category || 'Other',
+    name: doc.name || '',
     issue_date: doc.issueDate || null,
     expiry_date: doc.expiryDate || null,
-    reminder_days: Array.isArray(doc.reminders) && doc.reminders.length ? Math.min(...doc.reminders) : 30,
     notes: doc.notes || null,
+    file_path: doc.filePath || null,
     file_name: doc.fileName || null,
     file_type: doc.fileType || null,
-    file_path: doc.filePath || null,
     file_size: doc.fileSize || null,
     created_at: doc.createdAt || undefined,
     updated_at: new Date().toISOString()
@@ -317,12 +318,14 @@ function documentToDb(doc) {
 function documentFromDb(row) {
   return {
     id: row.id,
-    name: row.document_name || '',
-    category: row.document_type || 'Other',
-    documentNumber: row.document_number || '',
+    name: row.name || '',
+    category: row.category || 'Other',
     issueDate: row.issue_date || '',
     expiryDate: row.expiry_date || '',
-    reminders: row.reminder_days ? [Number(row.reminder_days)] : [30, 7, 1],
+    // reminder_days is not currently in public.documents.
+    // The UI keeps the standard reminder choices until a reminder_days
+    // column is added to the table.
+    reminders: [30, 7, 1],
     notes: row.notes || '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -379,7 +382,11 @@ function maintenanceFromDb(row) {
 
 const STORAGE_BUCKET = 'documents';
 const MAX_DOCUMENT_FILE_SIZE = 6 * 1024 * 1024;
-const ALLOWED_DOCUMENT_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png']);
+const ALLOWED_DOCUMENT_TYPES = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/png'
+]);
 
 function sanitizeFileName(name) {
   return String(name || 'file')
@@ -390,9 +397,11 @@ function sanitizeFileName(name) {
 
 function validateDocumentFile(file) {
   if (!file) return;
+
   if (!ALLOWED_DOCUMENT_TYPES.has(file.type)) {
     throw new Error('Only PDF, JPG, JPEG and PNG files are allowed.');
   }
+
   if (file.size > MAX_DOCUMENT_FILE_SIZE) {
     throw new Error('File size must be 6 MB or less.');
   }
@@ -404,10 +413,15 @@ function documentStoragePath(documentId, fileName) {
 
 async function uploadDocumentFile(file, documentId) {
   const client = getSupabase();
-  if (!client || !currentUser) throw new Error('You are not logged in.');
+
+  if (!client || !currentUser) {
+    throw new Error('You are not logged in.');
+  }
+
   validateDocumentFile(file);
 
   const path = documentStoragePath(documentId, file.name);
+
   const { error } = await client.storage
     .from(STORAGE_BUCKET)
     .upload(path, file, {
@@ -430,6 +444,7 @@ async function uploadDocumentFile(file, documentId) {
 
 async function deleteDocumentFile(filePath) {
   if (!filePath) return;
+
   const client = getSupabase();
   if (!client) return;
 
@@ -444,6 +459,7 @@ async function deleteDocumentFile(filePath) {
 
 async function getDocumentFileUrl(filePath) {
   const client = getSupabase();
+
   if (!client || !filePath) return null;
 
   const { data, error } = await client.storage
@@ -517,7 +533,7 @@ async function dbDelete(table, id) {
   const client = getSupabase();
   if (!client || !currentUser) throw new Error('You are not logged in.');
 
-  let filePath = null;
+  let oldFilePath = null;
 
   if (table === 'documents') {
     const { data: existing, error: readError } = await client
@@ -528,7 +544,7 @@ async function dbDelete(table, id) {
       .maybeSingle();
 
     if (readError) throw readError;
-    filePath = existing?.file_path || null;
+    oldFilePath = existing?.file_path || null;
   }
 
   const { error } = await client
@@ -542,8 +558,8 @@ async function dbDelete(table, id) {
     throw error;
   }
 
-  if (table === 'documents' && filePath) {
-    await deleteDocumentFile(filePath);
+  if (table === 'documents' && oldFilePath) {
+    await deleteDocumentFile(oldFilePath);
   }
 }
 
@@ -1193,11 +1209,6 @@ function openDocumentForm(existing) {
       </div>
 
       <div class="field">
-        <label>Document number</label>
-        <input type="text" name="documentNumber" value="${escapeHTML(d.documentNumber || '')}" placeholder="Optional">
-      </div>
-
-      <div class="field">
         <label>Issue date</label>
         <input type="date" name="issueDate" value="${d.issueDate || ''}">
       </div>
@@ -1230,6 +1241,12 @@ function openDocumentForm(existing) {
           <button type="button" class="filepick-btn" id="filePickBtn">Choose</button>
           <input type="file" id="fileInput" accept="application/pdf,image/jpeg,image/png" hidden>
         </div>
+
+        <div id="fileActions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+          ${d.filePath ? '<button type="button" class="btn" id="viewSelectedFileBtn">View file</button>' : ''}
+          ${d.filePath ? '<button type="button" class="btn danger" id="removeFileBtn">Remove File</button>' : ''}
+        </div>
+
         <small>PDF, JPG or PNG · Maximum 6 MB</small>
       </div>
 
@@ -1249,7 +1266,10 @@ function openDocumentForm(existing) {
   const fileInput = document.getElementById('fileInput');
   const filePickBtn = document.getElementById('filePickBtn');
   const fileNameEl = document.getElementById('fileName');
+  const fileActions = document.getElementById('fileActions');
+
   let selectedFile = null;
+  let removeExistingFile = false;
 
   filePickBtn?.addEventListener('click', () => fileInput?.click());
 
@@ -1260,18 +1280,81 @@ function openDocumentForm(existing) {
     try {
       validateDocumentFile(file);
       selectedFile = file;
-      fileNameEl.textContent = file.name;
+      removeExistingFile = false;
+      if (fileNameEl) fileNameEl.textContent = file.name;
+
+      // A newly selected file replaces the old attachment when Save is pressed.
+      if (fileActions) {
+        fileActions.innerHTML = `
+          <span style="font-size:13px;opacity:.75;">New file selected. Save to upload.</span>
+          <button type="button" class="btn danger" id="clearSelectedFileBtn">Remove Selection</button>
+        `;
+
+        document.getElementById('clearSelectedFileBtn')?.addEventListener('click', () => {
+          selectedFile = null;
+          if (fileInput) fileInput.value = '';
+          if (fileNameEl) fileNameEl.textContent = d.fileName || 'No file attached';
+
+          fileActions.innerHTML = `
+            ${d.filePath ? '<button type="button" class="btn" id="viewSelectedFileBtn">View file</button>' : ''}
+            ${d.filePath ? '<button type="button" class="btn danger" id="removeFileBtn">Remove File</button>' : ''}
+          `;
+          bindExistingFileButtons();
+        });
+      }
     } catch (error) {
       selectedFile = null;
-      fileInput.value = '';
+      if (fileInput) fileInput.value = '';
       alert(error.message);
     }
   });
 
+  function bindExistingFileButtons() {
+    document.getElementById('removeFileBtn')?.addEventListener('click', () => {
+      if (!confirm('Remove the uploaded file? The document itself will be kept.')) return;
+
+      selectedFile = null;
+      removeExistingFile = true;
+      if (fileInput) fileInput.value = '';
+      if (fileNameEl) fileNameEl.textContent = 'No file attached';
+
+      if (fileActions) {
+        fileActions.innerHTML = `
+          <span style="font-size:13px;opacity:.75;">File will be removed when you save.</span>
+        `;
+      }
+    });
+
+    document.getElementById('viewSelectedFileBtn')?.addEventListener('click', async () => {
+      if (!d.filePath) return;
+
+      const btn = document.getElementById('viewSelectedFileBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Opening...';
+      }
+
+      try {
+        const url = await getDocumentFileUrl(d.filePath);
+        if (!url) throw new Error('File URL could not be created.');
+        window.open(url, '_blank', 'noopener,noreferrer');
+      } catch (error) {
+        alert(error.message || 'Could not open file.');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'View file';
+        }
+      }
+    });
+  }
+
+  bindExistingFileButtons();
+
   document.getElementById('cancelBtn').addEventListener('click', closeModal);
 
   document.getElementById('deleteBtn')?.addEventListener('click', async () => {
-    if (!confirm('Delete this document?')) return;
+    if (!confirm('Delete this document and its uploaded file?')) return;
 
     try {
       await dbDelete('documents', d.id);
@@ -1302,12 +1385,15 @@ function openDocumentForm(existing) {
       id: d.id,
       name: String(fd.get('name') || '').trim(),
       category: fd.get('category'),
-      documentNumber: String(fd.get('documentNumber') || '').trim(),
       issueDate: issueDate || null,
       expiryDate,
       reminders,
       notes: String(fd.get('notes') || '').trim(),
       createdAt: d.createdAt,
+      fileName: d.fileName || null,
+      fileType: d.fileType || null,
+      filePath: d.filePath || null,
+      fileSize: d.fileSize || null,
       notifiedThresholds: isEdit && d.expiryDate === expiryDate ? (d.notifiedThresholds || []) : []
     };
 
@@ -1316,7 +1402,16 @@ function openDocumentForm(existing) {
       return;
     }
 
+    const saveBtn = e.target.querySelector('button[type="submit"]');
+    const originalSaveText = saveBtn?.textContent || 'Save';
+
     try {
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = selectedFile ? 'Uploading...' : 'Saving...';
+      }
+
+      const oldFilePath = d.filePath || null;
       let uploaded = null;
 
       if (selectedFile) {
@@ -1325,18 +1420,26 @@ function openDocumentForm(existing) {
         record.fileType = uploaded.fileType;
         record.filePath = uploaded.filePath;
         record.fileSize = uploaded.fileSize;
-      } else if (isEdit) {
-        record.fileName = d.fileName || null;
-        record.fileType = d.fileType || null;
-        record.filePath = d.filePath || null;
-        record.fileSize = d.fileSize || null;
+      } else if (removeExistingFile) {
+        record.fileName = null;
+        record.fileType = null;
+        record.filePath = null;
+        record.fileSize = null;
       }
 
-      await dbPut('documents', record);
+      try {
+        await dbPut('documents', record);
+      } catch (saveError) {
+        // Do not leave an orphaned new Storage object if the DB save fails.
+        if (uploaded?.filePath) {
+          await deleteDocumentFile(uploaded.filePath);
+        }
+        throw saveError;
+      }
 
-      // If a new file replaced an old one, remove the old storage object.
-      if (uploaded && isEdit && d.filePath && d.filePath !== uploaded.filePath) {
-        await deleteDocumentFile(d.filePath);
+      // Remove the old Storage object only after the database update succeeds.
+      if (oldFilePath && oldFilePath !== record.filePath) {
+        await deleteDocumentFile(oldFilePath);
       }
 
       closeModal();
@@ -1344,6 +1447,11 @@ function openDocumentForm(existing) {
     } catch (error) {
       console.error(error);
       alert(`Could not save document: ${error.message || error}`);
+    } finally {
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = originalSaveText;
+      }
     }
   });
 }
@@ -1535,7 +1643,6 @@ function openDetail(kind, item) {
 
   const rows = kind === 'document' ? `
     <div class="detail-row"><span class="k">Category</span><span>${escapeHTML(item.category)}</span></div>
-    ${item.documentNumber ? `<div class="detail-row"><span class="k">Number</span><span>${escapeHTML(item.documentNumber)}</span></div>` : ''}
     ${item.issueDate ? `<div class="detail-row"><span class="k">Issue date</span><span>${fmtDate(item.issueDate)}</span></div>` : ''}
     <div class="detail-row"><span class="k">Expiry date</span><span>${fmtDate(item.expiryDate)}</span></div>
     <div class="detail-row"><span class="k">Status</span><span class="card-chip chip-${cls}">${daysLabel(days)}</span></div>
@@ -1556,6 +1663,7 @@ function openDetail(kind, item) {
     <div class="modal-actions">
       <button type="button" class="btn" id="closeDetailBtn">Close</button>
       ${kind === 'document' && item.filePath ? '<button type="button" class="btn" id="viewFileBtn">View file</button>' : ''}
+      ${kind === 'document' && item.filePath ? '<button type="button" class="btn danger" id="removeFileDetailBtn">Remove File</button>' : ''}
       <button type="button" class="btn primary" id="editBtn">Edit</button>
     </div>
   `);
@@ -1580,6 +1688,36 @@ function openDetail(kind, item) {
       btn.textContent = 'View file';
     }
   });
+
+  document.getElementById('removeFileDetailBtn')?.addEventListener('click', async () => {
+    if (!item.filePath) return;
+    if (!confirm('Remove the uploaded file? The document itself will be kept.')) return;
+
+    const btn = document.getElementById('removeFileDetailBtn');
+    btn.disabled = true;
+    btn.textContent = 'Removing...';
+
+    try {
+      await deleteDocumentFile(item.filePath);
+
+      await dbPut('documents', {
+        ...item,
+        filePath: null,
+        fileName: null,
+        fileType: null,
+        fileSize: null
+      });
+
+      closeModal();
+      await render();
+    } catch (error) {
+      console.error('Remove file error:', error);
+      alert(`Could not remove file: ${error.message || error}`);
+      btn.disabled = false;
+      btn.textContent = 'Remove File';
+    }
+  });
+
   document.getElementById('editBtn').addEventListener('click', () => {
     closeModal();
     if (kind === 'document') openDocumentForm(item);
