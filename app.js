@@ -666,6 +666,7 @@ function documentFromDb(row) {
 }
 
 function maintenanceToDb(item) {
+  const reminders = Array.isArray(item.reminders) ? [...new Set(item.reminders.map(Number).filter(n => REMINDER_OPTIONS.includes(n)))] : [];
   return {
     id: item.id,
     user_id: currentUser.id,
@@ -673,7 +674,8 @@ function maintenanceToDb(item) {
     category: item.type || 'Other',
     last_service_date: item.lastServiceDate || null,
     next_service_date: item.nextServiceDate,
-    reminder_days: Array.isArray(item.reminders) && item.reminders.length ? Math.min(...item.reminders) : 7,
+    reminder_days: reminders.length ? Math.min(...reminders) : null,
+    reminder_days_list: reminders.length ? reminders : null,
     notes: [
       item.notes || '',
       item.cost != null && item.cost !== '' ? `Service cost: ₹${item.cost}` : ''
@@ -699,7 +701,9 @@ function maintenanceFromDb(row) {
     itemName: row.item_name || row.category || 'Other item',
     lastServiceDate: row.last_service_date || '',
     nextServiceDate: row.next_service_date || '',
-    reminders: row.reminder_days ? [Number(row.reminder_days)] : [30, 7, 1],
+    reminders: Array.isArray(row.reminder_days_list)
+      ? row.reminder_days_list.map(Number).filter(n => REMINDER_OPTIONS.includes(n))
+      : (row.reminder_days ? [Number(row.reminder_days)] : [30, 7, 1]),
     cost,
     notes,
     createdAt: row.created_at,
@@ -759,8 +763,69 @@ async function dbPut(table, obj) {
   }
 
   if (table === 'documents') return documentFromDb(data);
-  if (table === 'maintenance') return maintenanceFromDb(data);
+  if (table === 'maintenance') {
+    const item = maintenanceFromDb(data);
+    await syncMaintenanceExpense(item);
+    return item;
+  }
   return data;
+}
+
+async function syncMaintenanceExpense(item) {
+  const client = getSupabase();
+  if (!client || !currentUser || !item?.id) return;
+
+  // The expense report uses the service date + cost captured for each maintenance item.
+  // If cost/date are removed, remove the corresponding expense record too.
+  if (!item.lastServiceDate || item.cost == null || item.cost === '' || Number(item.cost) < 0) {
+    const { error } = await client
+      .from('maintenance_expenses')
+      .delete()
+      .eq('maintenance_id', item.id)
+      .eq('user_id', currentUser.id);
+    if (error) console.warn('Maintenance expense cleanup skipped:', error.message);
+    return;
+  }
+
+  const { error } = await client
+    .from('maintenance_expenses')
+    .upsert({
+      maintenance_id: item.id,
+      user_id: currentUser.id,
+      service_date: item.lastServiceDate,
+      amount: Number(item.cost),
+      item_name: item.itemName || item.type || 'Other item',
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'maintenance_id,service_date' });
+
+  if (error) throw error;
+}
+
+async function getMaintenanceExpenseSummary(fromDate, toDate) {
+  const client = getSupabase();
+  if (!client || !currentUser) return [];
+
+  let query = client
+    .from('maintenance_expenses')
+    .select('maintenance_id,item_name,service_date,amount')
+    .eq('user_id', currentUser.id)
+    .gte('service_date', fromDate)
+    .lte('service_date', toDate)
+    .order('service_date', { ascending: true });
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const groups = new Map();
+  (data || []).forEach(row => {
+    const key = row.maintenance_id || row.item_name || 'other';
+    if (!groups.has(key)) groups.set(key, { itemName: row.item_name || 'Other item', total: 0, count: 0 });
+    const g = groups.get(key);
+    g.total += Number(row.amount || 0);
+    g.count += 1;
+  });
+
+  return [...groups.values()].sort((a, b) => b.total - a.total);
 }
 
 async function dbDelete(table, id) {
@@ -1147,6 +1212,9 @@ async function renderMaintenance() {
     .map(m => ({ ...m, _days: daysUntil(m.nextServiceDate), _kind: 'maintenance' }))
     .sort((a, b) => (a._days ?? 999999) - (b._days ?? 999999));
 
+  const today = todayISO();
+  const monthStart = `${today.slice(0, 8)}01`;
+
   viewEl.innerHTML = `
     <div class="section" style="margin-top:8px;">
       <div class="section-head">
@@ -1155,9 +1223,70 @@ async function renderMaintenance() {
       </div>
       ${items.length ? items.map(cardHTML).join('') : emptyHTML('No maintenance items yet. Tap + to add one.')}
     </div>
+
+    <div class="finance-card" style="margin-top:16px;">
+      <div class="finance-section-title">Item-wise Expense Summary</div>
+      <p class="muted" style="margin-top:-6px;margin-bottom:14px;">View maintenance expenses for any period.</p>
+
+      <div class="field">
+        <label>From</label>
+        <input type="date" id="maintenanceExpenseFrom" value="${monthStart}" max="${today}">
+      </div>
+
+      <div class="field">
+        <label>To</label>
+        <input type="date" id="maintenanceExpenseTo" value="${today}" max="${today}">
+      </div>
+
+      <button class="btn primary" id="maintenanceExpenseCalculate" type="button">Show Expenses</button>
+      <div id="maintenanceExpenseResult" style="margin-top:14px;"></div>
+    </div>
   `;
 
   bindCardClicks();
+
+  document.getElementById('maintenanceExpenseCalculate')?.addEventListener('click', async () => {
+    const from = document.getElementById('maintenanceExpenseFrom').value;
+    const to = document.getElementById('maintenanceExpenseTo').value;
+    const result = document.getElementById('maintenanceExpenseResult');
+
+    if (!from || !to) {
+      result.innerHTML = emptyHTML('Please select both dates.');
+      return;
+    }
+    if (from > to) {
+      result.innerHTML = emptyHTML('From date cannot be after To date.');
+      return;
+    }
+
+    result.innerHTML = '<div class="empty">Loading expenses...</div>';
+    try {
+      const rows = await getMaintenanceExpenseSummary(from, to);
+      if (!rows.length) {
+        result.innerHTML = emptyHTML('No maintenance expenses found for this period.');
+        return;
+      }
+
+      const grandTotal = rows.reduce((sum, row) => sum + row.total, 0);
+      result.innerHTML = `
+        <div class="finance-result">
+          ${rows.map(row => `
+            <div class="finance-result-row">
+              <span>${escapeHTML(row.itemName)} <small>(${row.count} service${row.count > 1 ? 's' : ''})</small></span>
+              <strong>₹${formatFinanceMoney(row.total)}</strong>
+            </div>
+          `).join('')}
+          <div class="finance-result-row finance-highlight">
+            <span>Total Maintenance Expense</span>
+            <strong>₹${formatFinanceMoney(grandTotal)}</strong>
+          </div>
+        </div>
+      `;
+    } catch (error) {
+      console.error(error);
+      result.innerHTML = `<div class="empty">Could not load expenses. ${escapeHTML(error.message || error)}</div>`;
+    }
+  });
 }
 
 /* =========================================================
@@ -1740,6 +1869,7 @@ function openMaintenanceForm(existing) {
             </button>
           `).join('')}
         </div>
+        <small>Choose one or more reminders. All three are selected by default.</small>
       </div>
 
       <div class="field">
