@@ -1098,7 +1098,12 @@ function renderFinance() {
 
   const addExpenseBtn = document.getElementById('addFinanceExpenseBtn');
   if (addExpenseBtn) {
-    addExpenseBtn.onclick = () => openFinanceExpenseForm(null);
+    // Bind directly after the Finance DOM is rendered.
+    addExpenseBtn.onclick = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openFinanceExpenseForm(null);
+    };
   }
   document.getElementById('viewFinanceBtn').addEventListener('click', renderFinanceSummary);
   document.getElementById('financeFromDate').addEventListener('change', renderFinanceSummary);
@@ -1136,32 +1141,34 @@ function calculateEMI() {
     </div>`;
 }
 
-/* ---------------- Loan Summary ---------------- */
-
-function calculateLoanTotal() {
-  const home = Number(document.getElementById('homeLoanEMI').value) || 0;
-  const personal = Number(document.getElementById('personalLoanEMI').value) || 0;
-  const car = Number(document.getElementById('carLoanEMI').value) || 0;
-  const total = home + personal + car;
-
-  document.getElementById('loanTotalResult').innerHTML = `
-    <div class="finance-result">
-      <div class="finance-result-row"><span>Home Loan</span><strong>₹${formatFinanceMoney(home)}</strong></div>
-      <div class="finance-result-row"><span>Personal Loan</span><strong>₹${formatFinanceMoney(personal)}</strong></div>
-      <div class="finance-result-row"><span>Car Loan</span><strong>₹${formatFinanceMoney(car)}</strong></div>
-      <div class="finance-result-row finance-highlight"><span>Total Monthly EMI</span><strong>₹${formatFinanceMoney(total)}</strong></div>
-    </div>`;
+/* ---------------- Modal helpers ---------------- */
+function getModalRoot() {
+  let root = document.getElementById('modalRoot');
+  if (!root) {
+    root = document.createElement('div');
+    root.id = 'modalRoot';
+    document.body.appendChild(root);
+  }
+  return root;
 }
 
+function closeModal() {
+  getModalRoot().innerHTML = '';
+}
 
-/* ---------------- Modal helpers ---------------- */
-const modalRoot = document.getElementById('modalRoot');
-function closeModal() { modalRoot.innerHTML = ''; }
 function openModal(html) {
-  modalRoot.innerHTML = `<div class="modal-backdrop" id="backdrop"><div class="modal-sheet">${html}</div></div>`;
-  document.getElementById('backdrop').addEventListener('click', (e) => {
-    if (e.target.id === 'backdrop') closeModal();
-  });
+  const root = getModalRoot();
+  root.innerHTML = `
+    <div class="modal-backdrop" id="backdrop">
+      <div class="modal-sheet">${html}</div>
+    </div>`;
+
+  const backdrop = document.getElementById('backdrop');
+  if (backdrop) {
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop || e.target.id === 'backdrop') closeModal();
+    });
+  }
 }
 
 /* ---------------- Document form ---------------- */
@@ -1961,6 +1968,17 @@ async function checkReminders() {
 /* ---------------- Wire up ---------------- */
 document.querySelectorAll('.navbtn').forEach(btn => {
   btn.addEventListener('click', () => setView(btn.dataset.view));
+});
+
+// Finance Add Expense fallback: keeps the button working even if the
+// Finance view is re-rendered by another part of the application.
+document.addEventListener('click', (event) => {
+  const button = event.target.closest?.('#addFinanceExpenseBtn');
+  if (!button) return;
+  if (state.view !== 'finance') return;
+  event.preventDefault();
+  event.stopPropagation();
+  openFinanceExpenseForm(null);
 });
 
 fab.addEventListener('click', () => {
