@@ -1966,27 +1966,50 @@ async function checkReminders() {
 }
 
 /* ---------------- Wire up ---------------- */
-document.querySelectorAll('.navbtn').forEach(btn => {
-  btn.addEventListener('click', () => setView(btn.dataset.view));
-});
-
-// Finance Add Expense fallback: keeps the button working even if the
-// Finance view is re-rendered by another part of the application.
+/*
+ * Use delegated click handling for navigation, FAB and Finance Add Expense.
+ * These controls are sometimes re-rendered dynamically, so binding directly
+ * to the original DOM nodes is fragile. Delegation keeps all existing
+ * features working after every render().
+ */
 document.addEventListener('click', (event) => {
-  const button = event.target.closest?.('#addFinanceExpenseBtn');
-  if (!button) return;
-  if (state.view !== 'finance') return;
-  event.preventDefault();
-  event.stopPropagation();
-  openFinanceExpenseForm(null);
-});
+  const target = event.target instanceof Element ? event.target : null;
+  if (!target) return;
 
-fab.addEventListener('click', () => {
-  if (state.view === 'documents') openDocumentForm(null);
-  else if (state.view === 'maintenance') openMaintenanceForm(null);
-});
+  const navButton = target.closest('.navbtn');
+  if (navButton) {
+    event.preventDefault();
+    const nextView = navButton.dataset.view;
+    if (nextView) setView(nextView);
+    return;
+  }
 
-notifBtn.addEventListener('click', requestNotifPermission);
+  const financeAdd = target.closest('#addFinanceExpenseBtn');
+  if (financeAdd) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (currentUser && state.view === 'finance') {
+      openFinanceExpenseForm(null);
+    }
+    return;
+  }
+
+  const addButton = target.closest('#fab');
+  if (addButton) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!currentUser) return;
+    if (state.view === 'documents') openDocumentForm(null);
+    else if (state.view === 'maintenance') openMaintenanceForm(null);
+    return;
+  }
+
+  const notificationButton = target.closest('#notifPermBtn');
+  if (notificationButton) {
+    event.preventDefault();
+    requestNotifPermission();
+  }
+});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
