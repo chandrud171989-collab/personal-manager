@@ -103,9 +103,19 @@ fab.classList.add('hidden');
 
 function setView(view) {
   state.view = view;
-  document.querySelectorAll('.navbtn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
-  fab.classList.toggle('hidden', view === 'dashboard');
+
+  document.querySelectorAll('.navbtn').forEach(b =>
+    b.classList.toggle('active', b.dataset.view === view)
+  );
+
+  // + button only for Documents and Maintenance
+  fab.classList.toggle(
+    'hidden',
+    view === 'dashboard' || view === 'finance'
+  );
+
   render();
+}
 }
 
 async function render() {

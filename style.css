@@ -430,3 +430,32 @@ button{font-family:inherit;}
   line-height: 1.5;
   color: var(--muted);
 }
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logout-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #2d343d;
+  background: #1c2229;
+  color: #dce3ec;
+  padding: 9px 13px;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.logout-btn:hover {
+  background: #252c35;
+}
+
+.logout-icon {
+  font-size: 18px;
+  line-height: 1;
+}
