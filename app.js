@@ -53,8 +53,7 @@ document.addEventListener('click', (event) => {
   }
 });
 
-const APP_BUILD = "finance-v1.4-buttons";
-console.log("Personal Manager:", APP_BUILD);
+
 /* ---------------- Supabase Authentication ---------------- */
 
 let currentUser = null;
@@ -511,6 +510,10 @@ function fmtDate(dateStr) {
 }
 
 /* ---------------- Rendering ---------------- */
+// Prevent an older async render (for example Dashboard loading from IndexedDB)
+// from overwriting a newer view such as Documents, Maintenance, or Finance.
+let renderGeneration = 0;
+
 const viewEl = document.getElementById('view');
 const fab = document.getElementById('fab');
 
@@ -522,13 +525,20 @@ function setView(view) {
 }
 
 async function render() {
-  if (state.view === 'dashboard') return renderDashboard();
-  if (state.view === 'documents') return renderDocuments();
-  if (state.view === 'maintenance') return renderMaintenance();
-  if (state.view === 'finance') return renderFinance();
+  const generation = ++renderGeneration;
+  const view = state.view;
+
+  if (view === 'dashboard') return renderDashboard(generation);
+  if (view === 'documents') return renderDocuments(generation);
+  if (view === 'maintenance') return renderMaintenance(generation);
+  if (view === 'finance') return renderFinance();
 }
 
-async function renderDashboard() {
+function renderIsCurrent(generation, view) {
+  return generation === renderGeneration && state.view === view;
+}
+
+async function renderDashboard(generation) {
   const [docs, maint] = await Promise.all([dbGetAll('documents'), dbGetAll('maintenance')]);
 
   const docItems = docs.map(d => ({...d, _days: daysUntil(d.expiryDate), _kind:'document'}));
@@ -543,6 +553,8 @@ async function renderDashboard() {
 
   const overdueCount = [...docItems, ...maintItems].filter(x => x._days !== null && x._days < 0).length;
   const soonCount = [...docItems, ...maintItems].filter(x => x._days !== null && x._days >= 0 && x._days <= 7).length;
+
+  if (!renderIsCurrent(generation, 'dashboard')) return;
 
   viewEl.innerHTML = `
     <div class="stats">
@@ -603,7 +615,7 @@ function bindCardClicks() {
   });
 }
 
-async function renderDocuments() {
+async function renderDocuments(generation) {
   const docs = (await dbGetAll('documents')).map(d => ({...d, _days: daysUntil(d.expiryDate)}))
     .sort((a,b) => (a._days ?? 9999) - (b._days ?? 9999));
   viewEl.innerHTML = `
@@ -615,9 +627,11 @@ async function renderDocuments() {
   bindCardClicks();
 }
 
-async function renderMaintenance() {
+async function renderMaintenance(generation) {
   const items = (await dbGetAll('maintenance')).map(m => ({...m, _days: daysUntil(m.nextServiceDate)}))
     .sort((a,b) => (a._days ?? 9999) - (b._days ?? 9999));
+
+  if (!renderIsCurrent(generation, 'maintenance')) return;
 
   viewEl.innerHTML = `
     <div class="section" style="margin-top:8px;">
@@ -634,7 +648,9 @@ async function renderMaintenance() {
   document.getElementById('expenseToDate')?.addEventListener('change', renderMaintenanceExpenseSummary);
 
   // Show the summary immediately using the existing maintenance costs.
-  await renderMaintenanceExpenseSummary();
+  if (renderIsCurrent(generation, 'maintenance')) {
+    await renderMaintenanceExpenseSummary();
+  }
 }
 
 /* ---------------- Finance ---------------- */
