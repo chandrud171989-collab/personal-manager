@@ -32,6 +32,10 @@ let viewEl = null;
 let fab = null;
 let modalRoot = null;
 let authListenerStarted = false;
+let documentVaultKey = null;
+const DOCUMENT_BUCKET = 'documents';
+const VAULT_DB_NAME = 'personal-manager-vault';
+const VAULT_STORE_NAME = 'keys';
 
 /* =========================================================
    SUPABASE
@@ -83,6 +87,326 @@ function friendlyAuthError(error) {
   }
 
   return msg;
+}
+
+
+/* =========================================================
+   DOCUMENT PRIVACY / CLIENT-SIDE ENCRYPTION
+   =========================================================
+   The customer does not manually encrypt/decrypt anything.
+   Files are encrypted in the browser with AES-256-GCM BEFORE
+   they are uploaded to Supabase Storage.
+
+   A random per-user vault key is wrapped with a key derived
+   from the customer's password. The unwrapped CryptoKey is
+   cached locally in IndexedDB for convenience.
+   ========================================================= */
+
+function bytesToBase64(bytes) {
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+function base64ToBytes(value) {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function openVaultDb() {
+  return new Promise((resolve, reject) => {
+    if (!('indexedDB' in window)) return reject(new Error('IndexedDB is not available.'));
+
+    const request = indexedDB.open(VAULT_DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains(VAULT_STORE_NAME)) {
+        request.result.createObjectStore(VAULT_STORE_NAME);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error('Could not open local vault storage.'));
+  });
+}
+
+async function saveLocalVaultKey(userId, key) {
+  try {
+    const db = await openVaultDb();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(VAULT_STORE_NAME, 'readwrite');
+      tx.objectStore(VAULT_STORE_NAME).put(key, userId);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  } catch (error) {
+    console.warn('Local vault key cache unavailable:', error);
+  }
+}
+
+async function loadLocalVaultKey(userId) {
+  try {
+    const db = await openVaultDb();
+    const key = await new Promise((resolve, reject) => {
+      const tx = db.transaction(VAULT_STORE_NAME, 'readonly');
+      const request = tx.objectStore(VAULT_STORE_NAME).get(userId);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
+    db.close();
+    return key || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function clearLocalVaultKey(userId) {
+  if (!userId) return;
+  try {
+    const db = await openVaultDb();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(VAULT_STORE_NAME, 'readwrite');
+      tx.objectStore(VAULT_STORE_NAME).delete(userId);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  } catch (_) {}
+}
+
+async function deriveVaultWrapKey(password, salt) {
+  const material = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(password),
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  );
+
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt,
+      iterations: 600000,
+      hash: 'SHA-256'
+    },
+    material,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function createWrappedVault(password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const wrapKey = await deriveVaultWrapKey(password, salt);
+
+  const vaultKey = await crypto.subtle.generateKey(
+    { name: 'AES-GCM', length: 256 },
+    true,
+    ['encrypt', 'decrypt']
+  );
+
+  const rawVaultKey = await crypto.subtle.exportKey('raw', vaultKey);
+  const wrapped = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    wrapKey,
+    rawVaultKey
+  );
+
+  return {
+    vaultKey,
+    salt: bytesToBase64(salt),
+    wrapIv: bytesToBase64(iv),
+    wrappedKey: bytesToBase64(new Uint8Array(wrapped))
+  };
+}
+
+async function unwrapVault(password, row) {
+  const salt = base64ToBytes(row.salt);
+  const iv = base64ToBytes(row.wrap_iv);
+  const wrapped = base64ToBytes(row.wrapped_key);
+  const wrapKey = await deriveVaultWrapKey(password, salt);
+
+  const raw = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv },
+    wrapKey,
+    wrapped
+  );
+
+  return crypto.subtle.importKey(
+    'raw',
+    raw,
+    { name: 'AES-GCM' },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function ensureDocumentVault(password) {
+  if (!currentUser || !password) throw new Error('Password is required to unlock your private documents.');
+
+  const localKey = await loadLocalVaultKey(currentUser.id);
+  if (localKey) {
+    documentVaultKey = localKey;
+    return documentVaultKey;
+  }
+
+  const client = getSupabase();
+  if (!client) throw new Error('Supabase is not configured.');
+
+  const { data, error } = await client
+    .from('document_vaults')
+    .select('user_id,salt,wrap_iv,wrapped_key')
+    .eq('user_id', currentUser.id)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  if (!data) {
+    const created = await createWrappedVault(password);
+    const { error: insertError } = await client
+      .from('document_vaults')
+      .insert({
+        user_id: currentUser.id,
+        salt: created.salt,
+        wrap_iv: created.wrapIv,
+        wrapped_key: created.wrappedKey
+      });
+
+    if (insertError) throw insertError;
+
+    documentVaultKey = created.vaultKey;
+    await saveLocalVaultKey(currentUser.id, documentVaultKey);
+    return documentVaultKey;
+  }
+
+  try {
+    documentVaultKey = await unwrapVault(password, data);
+  } catch (_) {
+    throw new Error('Unable to unlock your private documents. Please check your password.');
+  }
+
+  await saveLocalVaultKey(currentUser.id, documentVaultKey);
+  return documentVaultKey;
+}
+
+async function restoreLocalDocumentVault() {
+  if (!currentUser) return null;
+  documentVaultKey = await loadLocalVaultKey(currentUser.id);
+  return documentVaultKey;
+}
+
+async function encryptDocumentFile(file) {
+  if (!documentVaultKey) throw new Error('Private document vault is locked. Please log in again.');
+
+  const input = new Uint8Array(await file.arrayBuffer());
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    documentVaultKey,
+    input
+  );
+
+  const combined = new Uint8Array(iv.length + encrypted.byteLength);
+  combined.set(iv, 0);
+  combined.set(new Uint8Array(encrypted), iv.length);
+
+  return new Blob([combined], { type: 'application/octet-stream' });
+}
+
+async function decryptDocumentBlob(blob, originalType) {
+  if (!documentVaultKey) throw new Error('Private document vault is locked. Please log in again.');
+
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const iv = bytes.slice(0, 12);
+  const ciphertext = bytes.slice(12);
+
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv },
+    documentVaultKey,
+    ciphertext
+  );
+
+  return new Blob([decrypted], { type: originalType || 'application/octet-stream' });
+}
+
+function validateDocumentFile(file) {
+  if (!file) return;
+  const allowed = ['application/pdf', 'image/jpeg', 'image/png'];
+  if (!allowed.includes(file.type)) {
+    throw new Error('Only PDF, JPG and PNG files are allowed.');
+  }
+  if (file.size > 6 * 1024 * 1024) {
+    throw new Error('File size must be 6 MB or less.');
+  }
+}
+
+async function uploadEncryptedDocument(file, documentId, oldPath = null) {
+  const client = getSupabase();
+  if (!client || !currentUser) throw new Error('You are not logged in.');
+
+  validateDocumentFile(file);
+  const encryptedBlob = await encryptDocumentFile(file);
+  const path = `${currentUser.id}/${documentId}-${crypto.randomUUID()}.enc`;
+
+  const { error } = await client.storage
+    .from(DOCUMENT_BUCKET)
+    .upload(path, encryptedBlob, {
+      contentType: 'application/octet-stream',
+      upsert: false
+    });
+
+  if (error) throw error;
+
+  if (oldPath) {
+    const { error: removeError } = await client.storage
+      .from(DOCUMENT_BUCKET)
+      .remove([oldPath]);
+    if (removeError) console.warn('Old encrypted file could not be removed:', removeError);
+  }
+
+  return {
+    filePath: path,
+    fileName: file.name,
+    fileType: file.type,
+    fileSize: file.size
+  };
+}
+
+async function removeEncryptedDocumentFile(path) {
+  if (!path) return;
+  const client = getSupabase();
+  if (!client) return;
+
+  const { error } = await client.storage
+    .from(DOCUMENT_BUCKET)
+    .remove([path]);
+
+  if (error) throw error;
+}
+
+async function viewEncryptedDocument(item) {
+  const client = getSupabase();
+  if (!client || !currentUser) throw new Error('You are not logged in.');
+  if (!item.filePath) throw new Error('No file is attached to this entry.');
+  if (!documentVaultKey) throw new Error('Private document vault is locked. Please log in again.');
+
+  const { data, error } = await client.storage
+    .from(DOCUMENT_BUCKET)
+    .download(item.filePath);
+
+  if (error) throw error;
+
+  const original = await decryptDocumentBlob(data, item.fileType);
+  const url = URL.createObjectURL(original);
+  window.open(url, '_blank', 'noopener,noreferrer');
+  setTimeout(() => URL.revokeObjectURL(url), 5 * 60 * 1000);
 }
 
 /* =========================================================
@@ -228,6 +552,11 @@ function renderLoginPage(mode = 'login', message = '') {
 
         if (data.session && data.user) {
           currentUser = data.user;
+          try {
+            await ensureDocumentVault(password);
+          } catch (vaultError) {
+            console.error('Document vault setup error:', vaultError);
+          }
           await startApp();
         } else {
           showAuthError('Account created. Please check your email to verify your account, then log in.');
@@ -241,6 +570,7 @@ function renderLoginPage(mode = 'login', message = '') {
         if (error) throw error;
 
         currentUser = data.user;
+        await ensureDocumentVault(password);
         await startApp();
       }
     } catch (error) {
@@ -276,6 +606,9 @@ function renderLoginPage(mode = 'login', message = '') {
 
 async function logout() {
   const client = getSupabase();
+  const oldUserId = currentUser?.id;
+  documentVaultKey = null;
+  if (oldUserId) await clearLocalVaultKey(oldUserId);
   currentUser = null;
 
   if (client) {
@@ -317,59 +650,18 @@ function documentFromDb(row) {
     id: row.id,
     name: row.name || '',
     category: row.category || 'Other',
-    documentNumber: '',
     issueDate: row.issue_date || '',
     expiryDate: row.expiry_date || '',
     reminders: [30, 7, 1],
     notes: row.notes || '',
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
     filePath: row.file_path || null,
     fileName: row.file_name || null,
     fileType: row.file_type || null,
     fileSize: row.file_size || null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
     notifiedThresholds: []
   };
-}
-
-async function uploadDocumentFile(file, documentId) {
-  const client = getSupabase();
-  if (!client || !currentUser || !file) return null;
-
-  const allowed = ['application/pdf', 'image/jpeg', 'image/png'];
-  if (!allowed.includes(file.type)) {
-    throw new Error('Please select a PDF, JPG, JPEG, or PNG file.');
-  }
-  if (file.size > 6 * 1024 * 1024) {
-    throw new Error('File size must be 6 MB or less.');
-  }
-
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const path = `${currentUser.id}/${documentId}/${Date.now()}_${safeName}`;
-
-  const { error } = await client.storage
-    .from('documents')
-    .upload(path, file, { contentType: file.type, upsert: false });
-
-  if (error) throw error;
-  return { path, name: file.name, type: file.type, size: file.size };
-}
-
-async function removeDocumentFile(filePath) {
-  const client = getSupabase();
-  if (!client || !filePath) return;
-  const { error } = await client.storage.from('documents').remove([filePath]);
-  if (error) throw error;
-}
-
-async function getDocumentFileUrl(filePath) {
-  const client = getSupabase();
-  if (!client || !filePath) return null;
-  const { data, error } = await client.storage
-    .from('documents')
-    .createSignedUrl(filePath, 300);
-  if (error) throw error;
-  return data?.signedUrl || null;
 }
 
 function maintenanceToDb(item) {
@@ -474,50 +766,24 @@ async function dbDelete(table, id) {
   const client = getSupabase();
   if (!client || !currentUser) throw new Error('You are not logged in.');
 
-  if (table === 'documents') {
-    const { data: row, error: readError } = await client
-      .from('documents')
-      .select('file_path')
-      .eq('id', id)
-      .eq('user_id', currentUser.id)
-      .maybeSingle();
-
-    if (readError) throw readError;
-
-    const { data: deletedRows, error: deleteError } = await client
-      .from('documents')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', currentUser.id)
-      .select('id');
-
-    if (deleteError) throw deleteError;
-    if (!deletedRows || deletedRows.length === 0) {
-      throw new Error('The document could not be deleted. Please check the Documents DELETE policy in Supabase.');
-    }
-
-    if (row?.file_path) {
-      const { error: storageError } = await client.storage
-        .from('documents')
-        .remove([row.file_path]);
-      if (storageError) console.warn('Storage file could not be removed:', storageError);
-    }
-    return;
-  }
-
-  const { data: deletedRows, error } = await client
+  const { data, error } = await client
     .from(table)
     .delete()
     .eq('id', id)
     .eq('user_id', currentUser.id)
     .select('id');
 
-  if (error) throw error;
-  if (!deletedRows || deletedRows.length === 0) {
-    throw new Error('The item could not be deleted. Please check the table DELETE policy in Supabase.');
+  if (error) {
+    console.error(`${table} delete error:`, error);
+    throw error;
   }
-}
 
+  if (!data || data.length === 0) {
+    throw new Error('The entry could not be deleted. Check the table DELETE policy in Supabase.');
+  }
+
+  return data[0];
+}
 
 /* =========================================================
    APP SHELL / AUTH GATE
@@ -641,6 +907,7 @@ async function initAuth() {
       // Avoid doing large async work directly inside the auth callback.
       setTimeout(async () => {
         if (currentUser) {
+          await restoreLocalDocumentVault();
           await startApp();
         } else if (event === 'SIGNED_OUT') {
           closeModal();
@@ -660,6 +927,7 @@ async function initAuth() {
   currentUser = data.session?.user || null;
 
   if (currentUser) {
+    await restoreLocalDocumentVault();
     await startApp();
   } else {
     // IMPORTANT: unauthenticated users see Login first.
@@ -1193,12 +1461,14 @@ function openDocumentForm(existing) {
       <div class="field">
         <label>Photo / PDF</label>
         <input id="documentFile" type="file" accept="application/pdf,image/jpeg,image/png">
-        <small>PDF, JPG or PNG. Maximum 6 MB.</small>
-        <div id="selectedFileName" class="filepick-name" style="margin-top:8px;">${d.fileName ? escapeHTML(d.fileName) : 'No file selected'}</div>
+        <small>Files are automatically encrypted in your browser before upload. PDF, JPG or PNG. Maximum 6 MB.</small>
+        <div id="selectedFileName" style="margin-top:8px;opacity:.85;">
+          ${d.fileName ? `Attached: ${escapeHTML(d.fileName)}` : 'No file selected'}
+        </div>
         ${d.filePath ? `
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
-            <button type="button" class="btn" id="viewFileBtn">View file</button>
-            <button type="button" class="btn danger" id="removeFileBtn">Remove file</button>
+            <button type="button" class="btn" id="viewFileBtn">View File</button>
+            <button type="button" class="btn danger" id="removeFileBtn">Remove File</button>
           </div>
         ` : ''}
       </div>
@@ -1206,7 +1476,7 @@ function openDocumentForm(existing) {
       <div class="modal-actions">
         ${isEdit ? '<button type="button" class="btn danger" id="deleteBtn">Delete Entry</button>' : ''}
         <button type="button" class="btn" id="cancelBtn">Cancel</button>
-        <button type="submit" class="btn primary" id="saveDocBtn">Save</button>
+        <button type="submit" class="btn primary" id="docSaveBtn">Save</button>
       </div>
     </form>
   `);
@@ -1216,124 +1486,151 @@ function openDocumentForm(existing) {
 
   const fileInput = document.getElementById('documentFile');
   const selectedFileName = document.getElementById('selectedFileName');
-  fileInput?.addEventListener('change', () => {
-    const file = fileInput.files?.[0];
-    if (file) selectedFileName.textContent = file.name;
-  });
+  let selectedFile = null;
+  let removeExistingFile = false;
 
-  document.getElementById('cancelBtn').addEventListener('click', closeModal);
+  fileInput?.addEventListener('change', () => {
+    selectedFile = fileInput.files?.[0] || null;
+    if (!selectedFile) {
+      selectedFileName.textContent = d.fileName ? `Attached: ${d.fileName}` : 'No file selected';
+      return;
+    }
+    try {
+      validateDocumentFile(selectedFile);
+      selectedFileName.textContent = `Selected: ${selectedFile.name}`;
+    } catch (error) {
+      fileInput.value = '';
+      selectedFile = null;
+      selectedFileName.textContent = d.fileName ? `Attached: ${d.fileName}` : 'No file selected';
+      alert(error.message);
+    }
+  });
 
   document.getElementById('viewFileBtn')?.addEventListener('click', async () => {
     try {
-      const url = await getDocumentFileUrl(d.filePath);
-      if (url) window.open(url, '_blank', 'noopener');
+      await viewEncryptedDocument(d);
     } catch (error) {
+      console.error(error);
       alert(`Could not open file: ${error.message || error}`);
     }
   });
 
-  document.getElementById('removeFileBtn')?.addEventListener('click', async () => {
+  document.getElementById('removeFileBtn')?.addEventListener('click', () => {
     if (!d.filePath) return;
-    if (!confirm('Remove this uploaded file? The document entry will remain.')) return;
+    if (!confirm('Remove the uploaded file? The document entry will remain.')) return;
 
-    try {
-      await removeDocumentFile(d.filePath);
-      const { error } = await getSupabase()
-        .from('documents')
-        .update({ file_path: null, file_name: null, file_type: null, file_size: null, updated_at: new Date().toISOString() })
-        .eq('id', d.id)
-        .eq('user_id', currentUser.id);
-      if (error) throw error;
-      closeModal();
-      await render();
-    } catch (error) {
-      alert(`Could not remove file: ${error.message || error}`);
-    }
+    // Do not delete the Storage object until Save succeeds.
+    // This prevents Cancel from leaving a broken file_path in the database.
+    removeExistingFile = true;
+    selectedFile = null;
+    if (fileInput) fileInput.value = '';
+    selectedFileName.textContent = 'File will be removed when you save.';
+    document.getElementById('viewFileBtn')?.remove();
+    document.getElementById('removeFileBtn')?.remove();
   });
 
+  document.getElementById('cancelBtn').addEventListener('click', closeModal);
+
   document.getElementById('deleteBtn')?.addEventListener('click', async () => {
-    if (!confirm('Delete this document and its uploaded file? This cannot be undone.')) return;
+    if (!confirm('Delete this entry? This will permanently remove the entry and its uploaded file.')) return;
 
     try {
+      const oldFilePath = d.filePath || null;
       await dbDelete('documents', d.id);
+      if (oldFilePath) {
+        try {
+          await removeEncryptedDocumentFile(oldFilePath);
+        } catch (storageError) {
+          console.warn('Encrypted file cleanup failed after entry deletion:', storageError);
+        }
+      }
       closeModal();
       await render();
     } catch (error) {
-      console.error('Document delete failed:', error);
-      alert(`Could not delete document: ${error.message || error}`);
+      console.error(error);
+      alert(`Could not delete entry: ${error.message || error}`);
     }
   });
 
   document.getElementById('docForm').addEventListener('submit', async e => {
     e.preventDefault();
 
+    const saveBtn = document.getElementById('docSaveBtn');
+    saveBtn.disabled = true;
+    const originalSaveText = saveBtn.textContent;
+    saveBtn.textContent = selectedFile ? 'Encrypting & Saving...' : 'Saving...';
+
     const fd = new FormData(e.target);
     const expiryDate = fd.get('expiryDate');
     const issueDate = fd.get('issueDate');
-    const selectedFile = fileInput?.files?.[0] || null;
 
     if (issueDate && expiryDate && issueDate > expiryDate) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = originalSaveText;
       alert('Expiry date must be after the issue date.');
       return;
     }
 
-    if (selectedFile) {
-      const allowed = ['application/pdf', 'image/jpeg', 'image/png'];
-      if (!allowed.includes(selectedFile.type)) {
-        alert('Please select a PDF, JPG, JPEG, or PNG file.');
-        return;
-      }
-      if (selectedFile.size > 6 * 1024 * 1024) {
-        alert('File size must be 6 MB or less.');
-        return;
-      }
+    const reminders = chips
+      .filter(chip => chip.classList.contains('on'))
+      .map(chip => Number(chip.dataset.val));
+
+    const record = {
+      id: d.id,
+      name: String(fd.get('name') || '').trim(),
+      category: fd.get('category'),
+      issueDate: issueDate || null,
+      expiryDate,
+      reminders,
+      notes: String(fd.get('notes') || '').trim(),
+      filePath: removeExistingFile ? null : d.filePath || null,
+      fileName: removeExistingFile ? null : d.fileName || null,
+      fileType: removeExistingFile ? null : d.fileType || null,
+      fileSize: removeExistingFile ? null : d.fileSize || null,
+      createdAt: d.createdAt,
+      notifiedThresholds: isEdit && d.expiryDate === expiryDate ? (d.notifiedThresholds || []) : []
+    };
+
+    if (!record.name || !expiryDate) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = originalSaveText;
+      alert('Please enter the document name and expiry date.');
+      return;
     }
 
-    const reminders = chips.filter(chip => chip.classList.contains('on')).map(chip => Number(chip.dataset.val));
-    const saveBtn = document.getElementById('saveDocBtn');
-    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
-
-    let uploaded = null;
     try {
+      const oldFilePath = d.filePath || null;
+
       if (selectedFile) {
-        uploaded = await uploadDocumentFile(selectedFile, d.id);
-      }
-
-      const record = {
-        id: d.id,
-        name: String(fd.get('name') || '').trim(),
-        category: fd.get('category'),
-        issueDate: issueDate || null,
-        expiryDate: expiryDate || null,
-        reminders,
-        notes: String(fd.get('notes') || '').trim(),
-        createdAt: d.createdAt,
-        filePath: uploaded?.path || d.filePath || null,
-        fileName: uploaded?.name || d.fileName || null,
-        fileType: uploaded?.type || d.fileType || null,
-        fileSize: uploaded?.size || d.fileSize || null
-      };
-
-      if (!record.name || !expiryDate) {
-        if (uploaded) await removeDocumentFile(uploaded.path).catch(() => {});
-        alert('Please enter the document name and expiry date.');
-        return;
+        // Upload the new encrypted file first. The old file is removed only
+        // after the database row has been successfully updated.
+        const uploaded = await uploadEncryptedDocument(selectedFile, record.id, null);
+        record.filePath = uploaded.filePath;
+        record.fileName = uploaded.fileName;
+        record.fileType = uploaded.fileType;
+        record.fileSize = uploaded.fileSize;
       }
 
       await dbPut('documents', record);
 
-      if (uploaded && d.filePath && d.filePath !== uploaded.path) {
-        await removeDocumentFile(d.filePath).catch(err => console.warn('Old file could not be removed:', err));
+      if (oldFilePath && (selectedFile || removeExistingFile)) {
+        try {
+          await removeEncryptedDocumentFile(oldFilePath);
+        } catch (storageError) {
+          console.warn('Old file could not be removed:', storageError);
+        }
       }
 
       closeModal();
       await render();
     } catch (error) {
-      if (uploaded) await removeDocumentFile(uploaded.path).catch(() => {});
       console.error(error);
-      alert(`Could not save document: ${error.message || error}`);
+      alert(`Could not save entry: ${error.message || error}`);
     } finally {
-      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save'; }
+      if (document.getElementById('docSaveBtn')) {
+        document.getElementById('docSaveBtn').disabled = false;
+        document.getElementById('docSaveBtn').textContent = originalSaveText;
+      }
     }
   });
 }
@@ -1539,9 +1836,14 @@ function openDetail(kind, item) {
     ${item.notes ? `<div class="detail-row"><span class="k">Notes</span><span style="text-align:right;max-width:65%">${escapeHTML(item.notes)}</span></div>` : ''}
   `;
 
+  const documentFileActions = kind === 'document' && item.filePath ? `
+    <div class="detail-row"><span class="k">Attachment</span><span style="text-align:right">${escapeHTML(item.fileName || 'Encrypted file')}<br><button type="button" class="btn" id="detailViewFileBtn" style="margin-top:8px">View File</button></span></div>
+  ` : '';
+
   openModal(`
     <div class="modal-title">${escapeHTML(kind === 'document' ? item.name : item.itemName)}</div>
     ${rows}
+    ${documentFileActions}
     <div class="modal-actions">
       <button type="button" class="btn" id="closeDetailBtn">Close</button>
       <button type="button" class="btn primary" id="editBtn">Edit</button>
@@ -1549,6 +1851,14 @@ function openDetail(kind, item) {
   `);
 
   document.getElementById('closeDetailBtn').addEventListener('click', closeModal);
+  document.getElementById('detailViewFileBtn')?.addEventListener('click', async () => {
+    try {
+      await viewEncryptedDocument(item);
+    } catch (error) {
+      console.error(error);
+      alert(`Could not open file: ${error.message || error}`);
+    }
+  });
   document.getElementById('editBtn').addEventListener('click', () => {
     closeModal();
     if (kind === 'document') openDocumentForm(item);

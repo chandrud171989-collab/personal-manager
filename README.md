@@ -41,3 +41,16 @@ There's no native Android app here (that needs Android Studio/Kotlin to compile 
 - For guaranteed background alerts, you'd want it in **App info → Battery → Unrestricted** for Chrome, or a true native app built in Android Studio.
 
 If it turns out you want the fully native version later (guaranteed background alarms via Android's AlarmManager), that's a bigger project I can help you scaffold in Kotlin — just let me know and we can start that separately.
+
+PERSONAL MANAGER - PRIVATE DOCUMENT STORAGE
+
+1. Replace your current app.js with app.js from this folder.
+2. In Supabase SQL Editor, run document_privacy_setup.sql once.
+3. Keep the documents bucket PRIVATE.
+4. The browser encrypts PDF/JPG/PNG files with AES-256-GCM before upload.
+5. Supabase Storage receives only encrypted .enc objects.
+6. Customers do not see encryption/decryption controls.
+7. On login, the app automatically unlocks the document vault using the password.
+8. The app caches the non-extractable CryptoKey locally in IndexedDB for convenience on that device.
+9. The current password-reset flow can reset the Supabase account password, but a password reset on a new device cannot unlock an existing encrypted vault without the old password. A future recovery-key flow should be added before production if password recovery must also recover encrypted documents.
+
