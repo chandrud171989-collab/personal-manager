@@ -641,46 +641,624 @@ function openDocumentForm(existing) {
 
 /* ---------------- Maintenance form ---------------- */
 function openMaintenanceForm(existing) {
-  const isEdit = !!existing;
-  const m = existing || { id: uid(), reminders: [30,7,1], notifiedThresholds: [] };
+  const isEdit = Boolean(existing);
+
+  // No reminder selected for a new item.
+  // For old records with multiple reminders, don't show all of them selected.
+  const existingReminders = Array.isArray(existing?.reminders)
+    ? existing.reminders
+    : [];
+
+  const validPresetReminders = [30, 7, 1];
+
+  let selectedReminder = null;
+  let customReminder = '';
+
+  if (existingReminders.length === 1) {
+    const value = Number(existingReminders[0]);
+
+    if (validPresetReminders.includes(value)) {
+      selectedReminder = value;
+    } else if (value > 0) {
+      customReminder = value;
+    }
+  }
+
+  const m = existing || {
+    id: crypto.randomUUID(),
+    reminders: [],
+    notifiedThresholds: []
+  };
+
+  const today = todayISO();
+
   openModal(`
-    <div class="modal-title">${isEdit ? 'Edit item' : 'Add home item'}</div>
+    <div class="modal-title">
+      ${isEdit ? 'Edit maintenance' : 'Add home item'}
+    </div>
+
     <form id="maintForm">
-      <div class="field"><label>Item</label>
+
+      <div class="field">
+        <label>Item</label>
+
         <select name="type" id="typeSelect">
-          ${MAINT_TYPES.map(t => `<option ${m.type===t?'selected':''}>${t}</option>`).join('')}
+          ${MAINT_TYPES.map(type => `
+            <option
+              value="${escapeHTML(type)}"
+              ${m.type === type ? 'selected' : ''}
+            >
+              ${escapeHTML(type)}
+            </option>
+          `).join('')}
         </select>
       </div>
-      <div class="field" id="customNameField" style="${m.type==='Other'?'':'display:none'}">
+
+      <div
+        class="field"
+        id="customNameField"
+        style="${m.type === 'Other' ? '' : 'display:none'}"
+      >
         <label>Custom name</label>
-        <input type="text" name="itemName" value="${escapeHTML(m.itemName && m.type==='Other' ? m.itemName : '')}" placeholder="e.g. Water heater">
+
+        <input
+          type="text"
+          name="itemName"
+          value="${escapeHTML(
+            m.type === 'Other' ? m.itemName || '' : ''
+          )}"
+          placeholder="e.g. Water heater"
+        >
       </div>
-      <div class="field"><label>Last service date</label>
-        <input type="date" name="lastServiceDate" value="${m.lastServiceDate||''}">
+
+      <div class="field">
+        <label>Last serviced date</label>
+
+        <input
+          type="date"
+          name="lastServiceDate"
+          value="${m.lastServiceDate || ''}"
+          max="${today}"
+        >
+
+        <small>Today or a past date only.</small>
       </div>
-      <div class="field"><label>Next service date</label>
-        <input type="date" name="nextServiceDate" required value="${m.nextServiceDate||''}">
+
+      <div class="field">
+        <label>Service due date</label>
+
+        <input
+          type="date"
+          name="nextServiceDate"
+          required
+          min="${today}"
+          value="${m.nextServiceDate || ''}"
+        >
+
+        <small>Today or a future date only.</small>
       </div>
-      <div class="field"><label>Cost (₹)</label>
-        <input type="number" name="cost" min="0" step="0.01" value="${m.cost ?? ''}" placeholder="0">
+
+      <div class="field">
+        <label>Cost (₹)</label>
+
+        <input
+          type="number"
+          name="cost"
+          min="0"
+          step="0.01"
+          value="${m.cost ?? ''}"
+          placeholder="0"
+        >
       </div>
-      <div class="field"><label>Remind me before service</label>
-        <div class="chip-row" id="reminderChipsM">
-          ${REMINDER_OPTIONS.map(n => `<button type="button" class="chip-toggle ${m.reminders?.includes(n)?'on':''}" data-val="${n}">${n} day${n>1?'s':''}</button>`).join('')}
+
+      <!-- =========================
+           REMINDER
+      ========================== -->
+
+      <div class="field">
+
+        <label>Remind me before service</label>
+
+        <div
+          class="chip-row"
+          id="reminderChipsM"
+          role="radiogroup"
+          aria-label="Reminder before service"
+        >
+
+          <button
+            type="button"
+            class="chip-toggle ${selectedReminder === 30 ? 'on' : ''}"
+            data-val="30"
+            aria-pressed="${selectedReminder === 30}"
+          >
+            30 days
+          </button>
+
+          <button
+            type="button"
+            class="chip-toggle ${selectedReminder === 7 ? 'on' : ''}"
+            data-val="7"
+            aria-pressed="${selectedReminder === 7}"
+          >
+            7 days
+          </button>
+
+          <button
+            type="button"
+            class="chip-toggle ${selectedReminder === 1 ? 'on' : ''}"
+            data-val="1"
+            aria-pressed="${selectedReminder === 1}"
+          >
+            1 day
+          </button>
+
+          <button
+            type="button"
+            class="chip-toggle ${customReminder ? 'on' : ''}"
+            id="customReminderBtn"
+            aria-pressed="${customReminder ? 'true' : 'false'}"
+          >
+            Custom
+          </button>
+
         </div>
+
+        <div
+          id="customReminderField"
+          style="${customReminder ? '' : 'display:none'}; margin-top:12px;"
+        >
+
+          <label
+            for="customReminderDays"
+            style="display:block; margin-bottom:8px;"
+          >
+            Custom reminder (days before service)
+          </label>
+
+          <input
+            type="number"
+            id="customReminderDays"
+            min="1"
+            max="365"
+            step="1"
+            value="${customReminder || ''}"
+            placeholder="e.g. 15"
+          >
+
+          <small>
+            Enter a number between 1 and 365 days.
+          </small>
+
+        </div>
+
       </div>
-      <div class="field"><label>Notes</label>
-        <textarea name="notes" placeholder="Optional notes">${escapeHTML(m.notes||'')}</textarea>
+
+      <div class="field">
+        <label>Notes</label>
+
+        <textarea
+          name="notes"
+          placeholder="Optional notes"
+        >${escapeHTML(m.notes || '')}</textarea>
       </div>
+
       <div class="modal-actions">
-        ${isEdit ? '<button type="button" class="btn danger" id="deleteBtn">Delete</button>' : ''}
-        <button type="button" class="btn" id="cancelBtn">Cancel</button>
-        <button type="submit" class="btn primary">Save</button>
+
+        ${
+          isEdit
+            ? '<button type="button" class="btn danger" id="deleteBtn">Delete</button>'
+            : ''
+        }
+
+        <button
+          type="button"
+          class="btn"
+          id="cancelBtn"
+        >
+          Cancel
+        </button>
+
+        <button
+          type="submit"
+          class="btn primary"
+        >
+          Save
+        </button>
+
       </div>
+
     </form>
   `);
 
-  const chips = Array.from(document.querySelectorAll('#reminderChipsM .chip-toggle'));
+  /* =========================
+     REMINDER LOGIC
+  ========================== */
+
+  const reminderChips = [
+    ...document.querySelectorAll(
+      '#reminderChipsM .chip-toggle[data-val]'
+    )
+  ];
+
+  const customReminderBtn =
+    document.getElementById('customReminderBtn');
+
+  const customReminderField =
+    document.getElementById('customReminderField');
+
+  const customReminderInput =
+    document.getElementById('customReminderDays');
+
+  function clearPresetSelection() {
+    reminderChips.forEach(chip => {
+      chip.classList.remove('on');
+      chip.setAttribute('aria-pressed', 'false');
+    });
+  }
+
+  function selectPreset(value) {
+    clearPresetSelection();
+
+    const chip = reminderChips.find(
+      c => Number(c.dataset.val) === Number(value)
+    );
+
+    if (chip) {
+      chip.classList.add('on');
+      chip.setAttribute('aria-pressed', 'true');
+    }
+
+    customReminderBtn.classList.remove('on');
+    customReminderBtn.setAttribute('aria-pressed', 'false');
+
+    customReminderField.style.display = 'none';
+    customReminderInput.value = '';
+  }
+
+  function selectCustom() {
+    clearPresetSelection();
+
+    customReminderBtn.classList.add('on');
+    customReminderBtn.setAttribute('aria-pressed', 'true');
+
+    customReminderField.style.display = '';
+
+    setTimeout(() => {
+      customReminderInput.focus();
+    }, 50);
+  }
+
+  reminderChips.forEach(chip => {
+
+    chip.addEventListener('click', () => {
+
+      const value = Number(chip.dataset.val);
+
+      // Clicking already-selected reminder deselects it.
+      if (
+        chip.classList.contains('on') &&
+        !customReminderBtn.classList.contains('on')
+      ) {
+        chip.classList.remove('on');
+        chip.setAttribute('aria-pressed', 'false');
+        return;
+      }
+
+      selectPreset(value);
+    });
+
+  });
+
+  customReminderBtn.addEventListener('click', () => {
+
+    if (customReminderBtn.classList.contains('on')) {
+
+      customReminderBtn.classList.remove('on');
+      customReminderBtn.setAttribute(
+        'aria-pressed',
+        'false'
+      );
+
+      customReminderField.style.display = 'none';
+      customReminderInput.value = '';
+
+    } else {
+
+      selectCustom();
+
+    }
+
+  });
+
+  /* =========================
+     ITEM TYPE
+  ========================== */
+
+  document
+    .getElementById('typeSelect')
+    .addEventListener('change', e => {
+
+      document.getElementById(
+        'customNameField'
+      ).style.display =
+        e.target.value === 'Other'
+          ? ''
+          : 'none';
+
+    });
+
+  /* =========================
+     CANCEL
+  ========================== */
+
+  document
+    .getElementById('cancelBtn')
+    .addEventListener('click', closeModal);
+
+  /* =========================
+     DELETE
+  ========================== */
+
+  document
+    .getElementById('deleteBtn')
+    ?.addEventListener('click', async () => {
+
+      if (!confirm('Delete this maintenance item?')) {
+        return;
+      }
+
+      try {
+
+        await dbDelete('maintenance', m.id);
+
+        closeModal();
+
+        await render();
+
+      } catch (error) {
+
+        alert(
+          `Could not delete item: ${
+            error.message || error
+          }`
+        );
+
+      }
+
+    });
+
+  /* =========================
+     SAVE
+  ========================== */
+
+  document
+    .getElementById('maintForm')
+    .addEventListener('submit', async e => {
+
+      e.preventDefault();
+
+      const fd = new FormData(e.target);
+
+      const type = fd.get('type');
+
+      const lastServiceDate =
+        fd.get('lastServiceDate');
+
+      const nextServiceDate =
+        fd.get('nextServiceDate');
+
+      const cost = fd.get('cost');
+
+      const todayDate =
+        new Date(`${today}T00:00:00`);
+
+      /* -------------------------
+         Validate last service date
+      ------------------------- */
+
+      if (lastServiceDate) {
+
+        const lastDate =
+          new Date(`${lastServiceDate}T00:00:00`);
+
+        if (lastDate > todayDate) {
+
+          alert(
+            'Last serviced date cannot be in the future.'
+          );
+
+          return;
+        }
+
+      }
+
+      /* -------------------------
+         Validate next service date
+      ------------------------- */
+
+      if (!nextServiceDate) {
+
+        alert(
+          'Please select a service due date.'
+        );
+
+        return;
+      }
+
+      const nextDate =
+        new Date(`${nextServiceDate}T00:00:00`);
+
+      if (nextDate < todayDate) {
+
+        alert(
+          'Service due date cannot be in the past.'
+        );
+
+        return;
+      }
+
+      if (lastServiceDate) {
+
+        const lastDate =
+          new Date(`${lastServiceDate}T00:00:00`);
+
+        if (nextDate <= lastDate) {
+
+          alert(
+            'Service due date must be after the last serviced date.'
+          );
+
+          return;
+        }
+
+      }
+
+      /* -------------------------
+         Validate cost
+      ------------------------- */
+
+      if (
+        cost !== '' &&
+        Number(cost) < 0
+      ) {
+
+        alert(
+          'Service cost cannot be negative.'
+        );
+
+        return;
+      }
+
+      /* -------------------------
+         Determine reminder
+      ------------------------- */
+
+      let selectedReminder = null;
+
+      const selectedPreset =
+        reminderChips.find(
+          chip =>
+            chip.classList.contains('on')
+        );
+
+      if (selectedPreset) {
+
+        selectedReminder =
+          Number(selectedPreset.dataset.val);
+
+      } else if (
+        customReminderBtn.classList.contains('on')
+      ) {
+
+        const customDays =
+          Number(customReminderInput.value);
+
+        if (
+          !Number.isInteger(customDays) ||
+          customDays < 1 ||
+          customDays > 365
+        ) {
+
+          alert(
+            'Please enter a custom reminder between 1 and 365 days.'
+          );
+
+          customReminderInput.focus();
+
+          return;
+        }
+
+        selectedReminder = customDays;
+      }
+
+      /*
+       * No reminder is perfectly valid.
+       *
+       * [] = customer doesn't want a reminder.
+       */
+
+      const reminders =
+        selectedReminder === null
+          ? []
+          : [selectedReminder];
+
+      /* -------------------------
+         Item name
+      ------------------------- */
+
+      const itemName =
+        type === 'Other'
+          ? String(
+              fd.get('itemName') || ''
+            ).trim() || 'Other item'
+          : type;
+
+      /* -------------------------
+         Record
+      ------------------------- */
+
+      const record = {
+
+        id: m.id,
+
+        type,
+
+        itemName,
+
+        lastServiceDate:
+          lastServiceDate || null,
+
+        nextServiceDate,
+
+        cost:
+          cost === ''
+            ? null
+            : Number(cost),
+
+        reminders,
+
+        notes:
+          String(
+            fd.get('notes') || ''
+          ).trim(),
+
+        createdAt:
+          m.createdAt,
+
+        notifiedThresholds:
+          isEdit &&
+          m.nextServiceDate === nextServiceDate
+            ? (m.notifiedThresholds || [])
+            : []
+
+      };
+
+      try {
+
+        await dbPut(
+          'maintenance',
+          record
+        );
+
+        closeModal();
+
+        await render();
+
+      } catch (error) {
+
+        console.error(error);
+
+        alert(
+          `Could not save maintenance item: ${
+            error.message || error
+          }`
+        );
+
+      }
+
+    });
+}  const chips = Array.from(document.querySelectorAll('#reminderChipsM .chip-toggle'));
   chips.forEach(chip => chip.addEventListener('click', () => chip.classList.toggle('on')));
 
   document.getElementById('typeSelect').addEventListener('change', (e) => {
