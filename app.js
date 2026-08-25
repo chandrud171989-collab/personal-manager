@@ -1,6 +1,6 @@
 /* ---------------- Config ---------------- */
-const DOC_CATEGORIES = ['Insurance','ID / License','Passport','Warranty','Vehicle RC','Subscription','Property','Other'];
-const MAINT_TYPES = ['AC','RO / Water Purifier','Refrigerator','Washing Machine','Geyser','Vehicle','Other'];
+const DOC_CATEGORIES = ['Àadhar','PAN','ID /Driving License','Passport','Voter ID','Warranty','Vehicle RC','Subscription','Property','Education Certificate','Other'];
+const MAINT_TYPES = ['AC','RO / Water Purifier','Refrigerator','Washing Machine','Geyser','Vehicle Service','Home Cleaning','Pest Control','Electrical/Plumbing','Other'];
 const REMINDER_OPTIONS = [30,7,1];
 
 let state = { view: 'dashboard' };
@@ -148,7 +148,7 @@ function cardHTML(item) {
   const chip = daysLabel(item._days);
   const title = item._kind === 'document' ? item.name : item.itemName;
   const sub = item._kind === 'document'
-    ? `${item.category} · expires ${fmtDate(item.expiryDate)}`
+    ? `${item.category} · ${item.expiryDate ? `expires ${fmtDate(item.expiryDate)}` : 'No expiry'}`
     : `${item.type} · next service ${fmtDate(item.nextServiceDate)}`;
   return `
     <div class="card status-${cls}" data-kind="${item._kind}" data-id="${item.id}">
@@ -208,48 +208,114 @@ function renderFinance() {
         <p>Manage your salary, loans and EMIs</p>
       </div>
 
-      <!-- Salary Calculator -->
-      <div class="finance-card">
+<!-- Salary Calculator -->
+<div class="finance-card">
 
-        <h2>💼 Salary Calculator</h2>
+  <h2>💼 Salary Calculator</h2>
 
-        <div class="field">
-          <label>Annual CTC (₹)</label>
-          <input
-            type="number"
-            id="financeCTC"
-            placeholder="Example: 1500000"
-          >
-        </div>
+  <div class="finance-section-title">
+    Salary Components
+  </div>
 
-        <div class="field">
-          <label>Variable Pay / Year (₹)</label>
-          <input
-            type="number"
-            id="financeVariable"
-            placeholder="Example: 150000"
-          >
-        </div>
+  <div class="field">
+    <label>Annual CTC (₹)</label>
+    <input
+      type="number"
+      id="financeCTC"
+      min="0"
+      placeholder="Example: 1500000">
+  </div>
 
-        <div class="field">
-          <label>PF / Month (₹)</label>
-          <input
-            type="number"
-            id="financePF"
-            placeholder="Example: 1800"
-          >
-        </div>
+  <div class="field">
+    <label>Basic Salary / Year (₹)</label>
+    <input
+      type="number"
+      id="financeBasic"
+      min="0"
+      placeholder="Example: 600000">
+  </div>
 
-        <button
-          type="button"
-          class="btn primary finance-calculate"
-          id="calculateSalaryBtn">
-          Calculate Salary
-        </button>
+  <div class="field">
+    <label>HRA / Year (₹)</label>
+    <input
+      type="number"
+      id="financeHRA"
+      min="0"
+      placeholder="Example: 300000">
+  </div>
 
-        <div id="salaryResult"></div>
+  <div class="field">
+    <label>Other Allowances / Year (₹)</label>
+    <input
+      type="number"
+      id="financeAllowance"
+      min="0"
+      placeholder="Example: 450000">
+  </div>
 
-      </div>
+  <div class="field">
+    <label>Variable Pay / Year (₹)</label>
+    <input
+      type="number"
+      id="financeVariable"
+      min="0"
+      placeholder="Example: 150000">
+  </div>
+
+
+  <div class="finance-section-title">
+    Employee Deductions
+  </div>
+
+  <div class="field">
+    <label>Employee PF / Month (₹)</label>
+    <input
+      type="number"
+      id="financePF"
+      min="0"
+      placeholder="Example: 1800">
+  </div>
+
+  <div class="field">
+    <label>Professional Tax / Month (₹)</label>
+    <input
+      type="number"
+      id="financePT"
+      min="0"
+      placeholder="Example: 200">
+  </div>
+
+  <div class="field">
+    <label>TDS / Income Tax / Month (₹)</label>
+    <input
+      type="number"
+      id="financeTDS"
+      min="0"
+      placeholder="Example: 5000">
+  </div>
+
+  <div class="field">
+    <label>Other Deductions / Month (₹)</label>
+    <input
+      type="number"
+      id="financeOtherDeduction"
+      min="0"
+      placeholder="Example: 500">
+  </div>
+
+
+  <button
+    type="button"
+    class="btn primary finance-calculate"
+    id="calculateSalaryBtn">
+
+    Calculate Salary
+
+  </button>
+
+  <div id="salaryResult"></div>
+
+</div>
 
 
       <!-- EMI Calculator -->
@@ -372,14 +438,35 @@ function calculateSalary() {
   const ctc =
     Number(document.getElementById('financeCTC').value) || 0;
 
+  const basic =
+    Number(document.getElementById('financeBasic').value) || 0;
+
+  const hra =
+    Number(document.getElementById('financeHRA').value) || 0;
+
+  const allowance =
+    Number(document.getElementById('financeAllowance').value) || 0;
+
   const variable =
     Number(document.getElementById('financeVariable').value) || 0;
 
   const pf =
     Number(document.getElementById('financePF').value) || 0;
 
+  const professionalTax =
+    Number(document.getElementById('financePT').value) || 0;
+
+  const tds =
+    Number(document.getElementById('financeTDS').value) || 0;
+
+  const otherDeduction =
+    Number(document.getElementById('financeOtherDeduction').value) || 0;
+
+
+  /* Validation */
+
   if (ctc <= 0) {
-    alert('Please enter your annual CTC.');
+    alert('Please enter your Annual CTC.');
     return;
   }
 
@@ -392,15 +479,30 @@ function calculateSalary() {
 
   const monthlyCTC = ctc / 12;
 
-  const monthlyFixed = fixedCTC / 12;
+  const monthlyFixedGross = fixedCTC / 12;
 
   const monthlyVariable = variable / 12;
 
-  const estimatedSalary = monthlyFixed - pf;
+  const totalMonthlyDeductions =
+    pf +
+    professionalTax +
+    tds +
+    otherDeduction;
+
+  const estimatedTakeHome =
+    monthlyFixedGross -
+    totalMonthlyDeductions;
+
+
+  /* Display Results */
 
   document.getElementById('salaryResult').innerHTML = `
 
     <div class="finance-result">
+
+      <div class="finance-result-heading">
+        Salary Summary
+      </div>
 
       <div class="finance-result-row">
         <span>Annual CTC</span>
@@ -413,25 +515,63 @@ function calculateSalary() {
       </div>
 
       <div class="finance-result-row">
+        <span>Variable Pay</span>
+        <strong>₹${formatFinanceMoney(variable)}</strong>
+      </div>
+
+      <div class="finance-result-row">
         <span>Monthly CTC</span>
         <strong>₹${formatFinanceMoney(monthlyCTC)}</strong>
       </div>
 
       <div class="finance-result-row">
-        <span>Monthly Variable</span>
-        <strong>₹${formatFinanceMoney(monthlyVariable)}</strong>
+        <span>Monthly Fixed Gross</span>
+        <strong>₹${formatFinanceMoney(monthlyFixedGross)}</strong>
       </div>
 
+
+      <div class="finance-result-heading deduction-heading">
+        Monthly Deductions
+      </div>
+
+      <div class="finance-result-row">
+        <span>Employee PF</span>
+        <strong>− ₹${formatFinanceMoney(pf)}</strong>
+      </div>
+
+      <div class="finance-result-row">
+        <span>Professional Tax</span>
+        <strong>− ₹${formatFinanceMoney(professionalTax)}</strong>
+      </div>
+
+      <div class="finance-result-row">
+        <span>TDS / Income Tax</span>
+        <strong>− ₹${formatFinanceMoney(tds)}</strong>
+      </div>
+
+      <div class="finance-result-row">
+        <span>Other Deductions</span>
+        <strong>− ₹${formatFinanceMoney(otherDeduction)}</strong>
+      </div>
+
+      <div class="finance-result-row">
+        <span>Total Deductions</span>
+        <strong>− ₹${formatFinanceMoney(totalMonthlyDeductions)}</strong>
+      </div>
+
+
       <div class="finance-result-row finance-highlight">
-        <span>Estimated Monthly Salary*</span>
-        <strong>₹${formatFinanceMoney(estimatedSalary)}</strong>
+        <span>Estimated Take Home</span>
+        <strong>₹${formatFinanceMoney(estimatedTakeHome)}</strong>
       </div>
 
     </div>
 
     <div class="finance-note">
-      *Approximate calculation before income tax and other deductions.
+      This is an estimate based on the values entered.
+      Actual salary may vary based on your company's payroll structure.
     </div>
+
   `;
 }
 
@@ -561,705 +701,348 @@ function openModal(html) {
 /* ---------------- Document form ---------------- */
 function openDocumentForm(existing) {
   const isEdit = !!existing;
-  const d = existing || { id: uid(), reminders: [30,7,1], notifiedThresholds: [] };
+  const old = existing || { id: uid(), reminders: [], notifiedThresholds: [] };
+
+  // Existing records that accidentally contain multiple reminders are normalized
+  // to one reminder for display. New documents have no reminder selected.
+  let selectedReminder = null;
+  if (Array.isArray(old.reminders) && old.reminders.length) {
+    const first = Number(old.reminders[0]);
+    if ([30, 7, 1].includes(first) || (Number.isInteger(first) && first > 0 && first <= 365)) {
+      selectedReminder = first;
+    }
+  }
+
+  const noExpiry = !old.expiryDate;
+
   openModal(`
     <div class="modal-title">${isEdit ? 'Edit document' : 'Add document'}</div>
     <form id="docForm">
       <div class="field"><label>Document name</label>
-        <input type="text" name="name" required value="${escapeHTML(d.name||'')}" placeholder="e.g. Car insurance">
+        <input type="text" name="name" required value="${escapeHTML(old.name||'')}" placeholder="e.g. Car insurance">
       </div>
       <div class="field"><label>Category</label>
         <select name="category">
-          ${DOC_CATEGORIES.map(c => `<option ${d.category===c?'selected':''}>${c}</option>`).join('')}
+          ${DOC_CATEGORIES.map(c => `<option ${old.category===c?'selected':''}>${escapeHTML(c)}</option>`).join('')}
         </select>
       </div>
+      <div class="field"><label>Issue date</label>
+        <input type="date" name="issueDate" value="${old.issueDate||''}">
+      </div>
       <div class="field"><label>Expiry date</label>
-        <input type="date" name="expiryDate" required value="${d.expiryDate||''}">
+        <input type="date" name="expiryDate" value="${old.expiryDate||''}" ${noExpiry?'disabled':''}>
+      </div>
+      <div class="field">
+        <label style="display:flex;align-items:center;gap:10px;text-transform:none;font-size:16px;">
+          <input type="checkbox" id="noExpiry" name="noExpiry" ${noExpiry?'checked':''} style="width:auto;">
+          <span>No expiry</span>
+        </label>
       </div>
       <div class="field"><label>Remind me before expiry</label>
-        <div class="chip-row" id="reminderChips">
-          ${REMINDER_OPTIONS.map(n => `<button type="button" class="chip-toggle ${d.reminders?.includes(n)?'on':''}" data-val="${n}">${n} day${n>1?'s':''}</button>`).join('')}
+        <div class="chip-row" id="docReminderChips">
+          ${[30,7,1].map(n => `<button type="button" class="chip-toggle ${selectedReminder===n?'on':''}" data-val="${n}" aria-pressed="${selectedReminder===n}">${n} day${n>1?'s':''}</button>`).join('')}
+          <button type="button" class="chip-toggle ${selectedReminder && ![30,7,1].includes(selectedReminder)?'on':''}" id="docCustomBtn" aria-pressed="${selectedReminder && ![30,7,1].includes(selectedReminder)?'true':'false'}">Custom</button>
+        </div>
+        <div id="docCustomField" style="${selectedReminder && ![30,7,1].includes(selectedReminder) && !noExpiry?'':'display:none;'}margin-top:12px;">
+          <label for="docCustomDays" style="display:block;margin-bottom:8px;text-transform:none;">Custom reminder (days before expiry)</label>
+          <input type="number" id="docCustomDays" min="1" max="365" step="1" value="${selectedReminder && ![30,7,1].includes(selectedReminder)?selectedReminder:''}" placeholder="e.g. 15">
         </div>
       </div>
       <div class="field"><label>Notes</label>
-        <textarea name="notes" placeholder="Optional notes">${escapeHTML(d.notes||'')}</textarea>
+        <textarea name="notes" placeholder="Optional notes">${escapeHTML(old.notes||'')}</textarea>
       </div>
       <div class="field"><label>Photo / PDF</label>
         <div class="filepick">
-          <span class="filepick-name" id="fileName">${d.fileName || 'No file attached'}</span>
+          <span class="filepick-name" id="fileName">${escapeHTML(old.fileName || 'No file attached')}</span>
           <button type="button" class="filepick-btn" id="filePickBtn">Choose</button>
           <input type="file" id="fileInput" accept="image/*,application/pdf">
         </div>
       </div>
       <div class="modal-actions">
-        ${isEdit ? '<button type="button" class="btn danger" id="deleteBtn">Delete</button>' : ''}
+        ${isEdit ? '<button type="button" class="btn danger" id="deleteBtn">Delete Entry</button>' : ''}
         <button type="button" class="btn" id="cancelBtn">Cancel</button>
         <button type="submit" class="btn primary">Save</button>
       </div>
     </form>
   `);
 
-  let fileData = d.fileBlob ? { blob: d.fileBlob, name: d.fileName, type: d.fileType } : null;
-  const chips = Array.from(document.querySelectorAll('#reminderChips .chip-toggle'));
-  chips.forEach(chip => chip.addEventListener('click', () => chip.classList.toggle('on')));
+  let fileData = old.fileBlob ? { blob: old.fileBlob, name: old.fileName, type: old.fileType } : null;
+  const chips = Array.from(document.querySelectorAll('#docReminderChips .chip-toggle[data-val]'));
+  const customBtn = document.getElementById('docCustomBtn');
+  const customField = document.getElementById('docCustomField');
+  const customInput = document.getElementById('docCustomDays');
+  const noExpiryBox = document.getElementById('noExpiry');
+  const expiryInput = document.querySelector('#docForm input[name="expiryDate"]');
+
+  function clearReminder() {
+    chips.forEach(c => { c.classList.remove('on'); c.setAttribute('aria-pressed','false'); });
+    customBtn.classList.remove('on');
+    customBtn.setAttribute('aria-pressed','false');
+    customField.style.display = 'none';
+    customInput.value = '';
+  }
+
+  function selectPreset(value) {
+    clearReminder();
+    const chip = chips.find(c => Number(c.dataset.val) === value);
+    if (chip) { chip.classList.add('on'); chip.setAttribute('aria-pressed','true'); }
+  }
+
+  function selectCustom() {
+    clearReminder();
+    customBtn.classList.add('on');
+    customBtn.setAttribute('aria-pressed','true');
+    customField.style.display = '';
+    customInput.focus();
+  }
+
+  chips.forEach(chip => chip.addEventListener('click', () => {
+    if (noExpiryBox.checked) return;
+    selectPreset(Number(chip.dataset.val));
+  }));
+
+  customBtn.addEventListener('click', () => {
+    if (noExpiryBox.checked) return;
+    if (customBtn.classList.contains('on')) clearReminder();
+    else selectCustom();
+  });
+
+  noExpiryBox.addEventListener('change', () => {
+    if (noExpiryBox.checked) {
+      expiryInput.value = '';
+      expiryInput.disabled = true;
+      clearReminder();
+      chips.forEach(c => c.disabled = true);
+      customBtn.disabled = true;
+      customInput.disabled = true;
+    } else {
+      expiryInput.disabled = false;
+      chips.forEach(c => c.disabled = false);
+      customBtn.disabled = false;
+      customInput.disabled = false;
+    }
+  });
+
+  // Ensure the initial disabled state is correct.
+  noExpiryBox.dispatchEvent(new Event('change'));
 
   document.getElementById('filePickBtn').addEventListener('click', () => document.getElementById('fileInput').click());
-  document.getElementById('fileInput').addEventListener('change', (e) => {
+  document.getElementById('fileInput').addEventListener('change', e => {
     const f = e.target.files[0];
     if (f) {
+      if (f.size > 6 * 1024 * 1024) { alert('Maximum file size is 6 MB.'); e.target.value=''; return; }
       fileData = { blob: f, name: f.name, type: f.type };
       document.getElementById('fileName').textContent = f.name;
     }
   });
+
   document.getElementById('cancelBtn').addEventListener('click', closeModal);
+
   if (isEdit) {
     document.getElementById('deleteBtn').addEventListener('click', async () => {
-      if (confirm('Delete this document?')) { await dbDelete('documents', d.id); closeModal(); render(); }
+      if (!confirm('Delete this document entry?')) return;
+      try { await dbDelete('documents', old.id); closeModal(); await render(); }
+      catch (err) { alert(`Could not delete document: ${err.message || err}`); }
     });
   }
-  document.getElementById('docForm').addEventListener('submit', async (e) => {
+
+  document.getElementById('docForm').addEventListener('submit', async e => {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const reminders = chips.filter(c => c.classList.contains('on')).map(c => Number(c.dataset.val));
+    const issueDate = String(fd.get('issueDate') || '');
+    const expiryDate = noExpiryBox.checked ? null : String(fd.get('expiryDate') || '');
+
+    if (issueDate && expiryDate && issueDate > expiryDate) {
+      alert('Expiry date must be after the issue date.'); return;
+    }
+
+    let reminder = null;
+    if (!noExpiryBox.checked) {
+      const selected = chips.find(c => c.classList.contains('on'));
+      if (selected) reminder = Number(selected.dataset.val);
+      else if (customBtn.classList.contains('on')) {
+        const n = Number(customInput.value);
+        if (!Number.isInteger(n) || n < 1 || n > 365) {
+          alert('Please enter a custom reminder between 1 and 365 days.'); return;
+        }
+        reminder = n;
+      }
+    }
+
     const record = {
-      id: d.id,
-      name: fd.get('name').trim(),
+      ...old,
+      id: old.id,
+      name: String(fd.get('name') || '').trim(),
       category: fd.get('category'),
-      expiryDate: fd.get('expiryDate'),
-      notes: fd.get('notes').trim(),
-      reminders,
-      notifiedThresholds: isEdit && existing.expiryDate === fd.get('expiryDate') ? (d.notifiedThresholds||[]) : [],
-      fileBlob: fileData ? fileData.blob : null,
-      fileName: fileData ? fileData.name : null,
-      fileType: fileData ? fileData.type : null,
+      issueDate: issueDate || null,
+      expiryDate,
+      notes: String(fd.get('notes') || '').trim(),
+      reminders: reminder === null ? [] : [reminder],
+      notifiedThresholds: isEdit && old.expiryDate === expiryDate ? (old.notifiedThresholds || []) : [],
+      fileBlob: fileData ? fileData.blob : old.fileBlob || null,
+      fileName: fileData ? fileData.name : old.fileName || null,
+      fileType: fileData ? fileData.type : old.fileType || null
     };
-    await dbPut('documents', record);
-    closeModal();
-    render();
+
+    if (!record.name) { alert('Please enter a document name.'); return; }
+
+    try { await dbPut('documents', record); closeModal(); await render(); }
+    catch (err) { console.error(err); alert(`Could not save document: ${err.message || err}`); }
   });
 }
 
 /* ---------------- Maintenance form ---------------- */
 function openMaintenanceForm(existing) {
-  const isEdit = Boolean(existing);
-
-  // No reminder selected for a new item.
-  // For old records with multiple reminders, don't show all of them selected.
-  const existingReminders = Array.isArray(existing?.reminders)
-    ? existing.reminders
-    : [];
-
-  const validPresetReminders = [30, 7, 1];
+  const isEdit = !!existing;
+  const old = existing || { id: uid(), reminders: [], notifiedThresholds: [] };
+  const todayDate = new Date().toISOString().split('T')[0];
 
   let selectedReminder = null;
-  let customReminder = '';
-
-  if (existingReminders.length === 1) {
-    const value = Number(existingReminders[0]);
-
-    if (validPresetReminders.includes(value)) {
-      selectedReminder = value;
-    } else if (value > 0) {
-      customReminder = value;
-    }
+  if (Array.isArray(old.reminders) && old.reminders.length) {
+    const first = Number(old.reminders[0]);
+    if (Number.isInteger(first) && first > 0 && first <= 365) selectedReminder = first;
   }
 
-  const m = existing || {
-    id: crypto.randomUUID(),
-    reminders: [],
-    notifiedThresholds: []
-  };
-
-  const today = todayISO();
-
   openModal(`
-    <div class="modal-title">
-      ${isEdit ? 'Edit maintenance' : 'Add home item'}
-    </div>
-
+    <div class="modal-title">${isEdit ? 'Edit item' : 'Add home item'}</div>
     <form id="maintForm">
-
-      <div class="field">
-        <label>Item</label>
-
+      <div class="field"><label>Item</label>
         <select name="type" id="typeSelect">
-          ${MAINT_TYPES.map(type => `
-            <option
-              value="${escapeHTML(type)}"
-              ${m.type === type ? 'selected' : ''}
-            >
-              ${escapeHTML(type)}
-            </option>
-          `).join('')}
+          ${MAINT_TYPES.map(t => `<option ${old.type===t?'selected':''}>${escapeHTML(t)}</option>`).join('')}
         </select>
       </div>
-
-      <div
-        class="field"
-        id="customNameField"
-        style="${m.type === 'Other' ? '' : 'display:none'}"
-      >
+      <div class="field" id="customNameField" style="${old.type==='Other'?'':'display:none'}">
         <label>Custom name</label>
-
-        <input
-          type="text"
-          name="itemName"
-          value="${escapeHTML(
-            m.type === 'Other' ? m.itemName || '' : ''
-          )}"
-          placeholder="e.g. Water heater"
-        >
+        <input type="text" name="itemName" value="${escapeHTML(old.type==='Other' ? (old.itemName||'') : '')}" placeholder="e.g. Water heater">
       </div>
-
-      <div class="field">
-        <label>Last serviced date</label>
-
-        <input
-          type="date"
-          name="lastServiceDate"
-          value="${m.lastServiceDate || ''}"
-          max="${today}"
-        >
-
+      <div class="field"><label>Last service date</label>
+        <input type="date" name="lastServiceDate" value="${old.lastServiceDate||''}" max="${todayDate}">
         <small>Today or a past date only.</small>
       </div>
-
-      <div class="field">
-        <label>Service due date</label>
-
-        <input
-          type="date"
-          name="nextServiceDate"
-          required
-          min="${today}"
-          value="${m.nextServiceDate || ''}"
-        >
-
+      <div class="field"><label>Service due date</label>
+        <input type="date" name="nextServiceDate" required min="${todayDate}" value="${old.nextServiceDate||''}">
         <small>Today or a future date only.</small>
       </div>
-
-      <div class="field">
-        <label>Cost (₹)</label>
-
-        <input
-          type="number"
-          name="cost"
-          min="0"
-          step="0.01"
-          value="${m.cost ?? ''}"
-          placeholder="0"
-        >
+      <div class="field"><label>Cost (₹)</label>
+        <input type="number" name="cost" min="0" step="0.01" value="${old.cost ?? ''}" placeholder="0">
       </div>
-
-      <!-- =========================
-           REMINDER
-      ========================== -->
-
-      <div class="field">
-
-        <label>Remind me before service</label>
-
-        <div
-          class="chip-row"
-          id="reminderChipsM"
-          role="radiogroup"
-          aria-label="Reminder before service"
-        >
-
-          <button
-            type="button"
-            class="chip-toggle ${selectedReminder === 30 ? 'on' : ''}"
-            data-val="30"
-            aria-pressed="${selectedReminder === 30}"
-          >
-            30 days
-          </button>
-
-          <button
-            type="button"
-            class="chip-toggle ${selectedReminder === 7 ? 'on' : ''}"
-            data-val="7"
-            aria-pressed="${selectedReminder === 7}"
-          >
-            7 days
-          </button>
-
-          <button
-            type="button"
-            class="chip-toggle ${selectedReminder === 1 ? 'on' : ''}"
-            data-val="1"
-            aria-pressed="${selectedReminder === 1}"
-          >
-            1 day
-          </button>
-
-          <button
-            type="button"
-            class="chip-toggle ${customReminder ? 'on' : ''}"
-            id="customReminderBtn"
-            aria-pressed="${customReminder ? 'true' : 'false'}"
-          >
-            Custom
-          </button>
-
+      <div class="field"><label>Remind me before service</label>
+        <div class="chip-row" id="maintReminderChips">
+          ${[30,7,1].map(n => `<button type="button" class="chip-toggle ${selectedReminder===n?'on':''}" data-val="${n}" aria-pressed="${selectedReminder===n}">${n} day${n>1?'s':''}</button>`).join('')}
+          <button type="button" class="chip-toggle ${selectedReminder && ![30,7,1].includes(selectedReminder)?'on':''}" id="maintCustomBtn" aria-pressed="${selectedReminder && ![30,7,1].includes(selectedReminder)?'true':'false'}">Custom</button>
         </div>
-
-        <div
-          id="customReminderField"
-          style="${customReminder ? '' : 'display:none'}; margin-top:12px;"
-        >
-
-          <label
-            for="customReminderDays"
-            style="display:block; margin-bottom:8px;"
-          >
-            Custom reminder (days before service)
-          </label>
-
-          <input
-            type="number"
-            id="customReminderDays"
-            min="1"
-            max="365"
-            step="1"
-            value="${customReminder || ''}"
-            placeholder="e.g. 15"
-          >
-
-          <small>
-            Enter a number between 1 and 365 days.
-          </small>
-
+        <div id="maintCustomField" style="${selectedReminder && ![30,7,1].includes(selectedReminder)?'':'display:none;'}margin-top:12px;">
+          <label for="maintCustomDays" style="display:block;margin-bottom:8px;text-transform:none;">Custom reminder (days before service)</label>
+          <input type="number" id="maintCustomDays" min="1" max="365" step="1" value="${selectedReminder && ![30,7,1].includes(selectedReminder)?selectedReminder:''}" placeholder="e.g. 15">
         </div>
-
       </div>
-
-      <div class="field">
-        <label>Notes</label>
-
-        <textarea
-          name="notes"
-          placeholder="Optional notes"
-        >${escapeHTML(m.notes || '')}</textarea>
+      <div class="field"><label>Notes</label>
+        <textarea name="notes" placeholder="Optional notes">${escapeHTML(old.notes||'')}</textarea>
       </div>
-
       <div class="modal-actions">
-
-        ${
-          isEdit
-            ? '<button type="button" class="btn danger" id="deleteBtn">Delete</button>'
-            : ''
-        }
-
-        <button
-          type="button"
-          class="btn"
-          id="cancelBtn"
-        >
-          Cancel
-        </button>
-
-        <button
-          type="submit"
-          class="btn primary"
-        >
-          Save
-        </button>
-
+        ${isEdit ? '<button type="button" class="btn danger" id="deleteBtn">Delete Entry</button>' : ''}
+        <button type="button" class="btn" id="cancelBtn">Cancel</button>
+        <button type="submit" class="btn primary">Save</button>
       </div>
-
     </form>
   `);
 
-  /* =========================
-     REMINDER LOGIC
-  ========================== */
+  const chips = Array.from(document.querySelectorAll('#maintReminderChips .chip-toggle[data-val]'));
+  const customBtn = document.getElementById('maintCustomBtn');
+  const customField = document.getElementById('maintCustomField');
+  const customInput = document.getElementById('maintCustomDays');
 
-  const reminderChips = [
-    ...document.querySelectorAll(
-      '#reminderChipsM .chip-toggle[data-val]'
-    )
-  ];
-
-  const customReminderBtn =
-    document.getElementById('customReminderBtn');
-
-  const customReminderField =
-    document.getElementById('customReminderField');
-
-  const customReminderInput =
-    document.getElementById('customReminderDays');
-
-  function clearPresetSelection() {
-    reminderChips.forEach(chip => {
-      chip.classList.remove('on');
-      chip.setAttribute('aria-pressed', 'false');
-    });
+  function clearReminder() {
+    chips.forEach(c => { c.classList.remove('on'); c.setAttribute('aria-pressed','false'); });
+    customBtn.classList.remove('on');
+    customBtn.setAttribute('aria-pressed','false');
+    customField.style.display = 'none';
+    customInput.value = '';
   }
-
   function selectPreset(value) {
-    clearPresetSelection();
-
-    const chip = reminderChips.find(
-      c => Number(c.dataset.val) === Number(value)
-    );
-
-    if (chip) {
-      chip.classList.add('on');
-      chip.setAttribute('aria-pressed', 'true');
-    }
-
-    customReminderBtn.classList.remove('on');
-    customReminderBtn.setAttribute('aria-pressed', 'false');
-
-    customReminderField.style.display = 'none';
-    customReminderInput.value = '';
+    clearReminder();
+    const chip = chips.find(c => Number(c.dataset.val) === value);
+    if (chip) { chip.classList.add('on'); chip.setAttribute('aria-pressed','true'); }
   }
-
   function selectCustom() {
-    clearPresetSelection();
-
-    customReminderBtn.classList.add('on');
-    customReminderBtn.setAttribute('aria-pressed', 'true');
-
-    customReminderField.style.display = '';
-
-    setTimeout(() => {
-      customReminderInput.focus();
-    }, 50);
+    clearReminder();
+    customBtn.classList.add('on');
+    customBtn.setAttribute('aria-pressed','true');
+    customField.style.display = '';
+    customInput.focus();
   }
 
-  reminderChips.forEach(chip => {
-
-    chip.addEventListener('click', () => {
-
-      const value = Number(chip.dataset.val);
-
-      // Clicking already-selected reminder deselects it.
-      if (
-        chip.classList.contains('on') &&
-        !customReminderBtn.classList.contains('on')
-      ) {
-        chip.classList.remove('on');
-        chip.setAttribute('aria-pressed', 'false');
-        return;
-      }
-
-      selectPreset(value);
-    });
-
+  chips.forEach(chip => chip.addEventListener('click', () => selectPreset(Number(chip.dataset.val))));
+  customBtn.addEventListener('click', () => {
+    if (customBtn.classList.contains('on')) clearReminder();
+    else selectCustom();
   });
 
-  customReminderBtn.addEventListener('click', () => {
+  document.getElementById('typeSelect').addEventListener('change', e => {
+    document.getElementById('customNameField').style.display = e.target.value === 'Other' ? '' : 'none';
+  });
+  document.getElementById('cancelBtn').addEventListener('click', closeModal);
 
-    if (customReminderBtn.classList.contains('on')) {
+  if (isEdit) {
+    document.getElementById('deleteBtn').addEventListener('click', async () => {
+      if (!confirm('Delete this maintenance entry?')) return;
+      try { await dbDelete('maintenance', old.id); closeModal(); await render(); }
+      catch (err) { alert(`Could not delete maintenance item: ${err.message || err}`); }
+    });
+  }
 
-      customReminderBtn.classList.remove('on');
-      customReminderBtn.setAttribute(
-        'aria-pressed',
-        'false'
-      );
+  document.getElementById('maintForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const type = fd.get('type');
+    const lastServiceDate = String(fd.get('lastServiceDate') || '');
+    const nextServiceDate = String(fd.get('nextServiceDate') || '');
+    const costRaw = String(fd.get('cost') || '');
 
-      customReminderField.style.display = 'none';
-      customReminderInput.value = '';
+    const today = new Date(); today.setHours(0,0,0,0);
+    if (lastServiceDate) {
+      const lastDate = new Date(lastServiceDate + 'T00:00:00');
+      if (lastDate > today) { alert('Last serviced date cannot be in the future.'); return; }
+    }
+    if (!nextServiceDate) { alert('Please select a service due date.'); return; }
+    const nextDate = new Date(nextServiceDate + 'T00:00:00');
+    if (nextDate < today) { alert('Service due date cannot be in the past.'); return; }
+    if (lastServiceDate) {
+      const lastDate = new Date(lastServiceDate + 'T00:00:00');
+      if (nextDate <= lastDate) { alert('Service due date must be after the last serviced date.'); return; }
+    }
+    if (costRaw !== '' && Number(costRaw) < 0) { alert('Service cost cannot be negative.'); return; }
 
-    } else {
-
-      selectCustom();
-
+    let reminder = null;
+    const selected = chips.find(c => c.classList.contains('on'));
+    if (selected) reminder = Number(selected.dataset.val);
+    else if (customBtn.classList.contains('on')) {
+      const n = Number(customInput.value);
+      if (!Number.isInteger(n) || n < 1 || n > 365) { alert('Please enter a custom reminder between 1 and 365 days.'); return; }
+      reminder = n;
     }
 
+    const itemName = type === 'Other'
+      ? (String(fd.get('itemName') || '').trim() || 'Other item')
+      : type;
+
+    const record = {
+      ...old,
+      id: old.id,
+      type,
+      itemName,
+      lastServiceDate: lastServiceDate || null,
+      nextServiceDate,
+      cost: costRaw === '' ? null : Number(costRaw),
+      notes: String(fd.get('notes') || '').trim(),
+      reminders: reminder === null ? [] : [reminder],
+      notifiedThresholds: isEdit && old.nextServiceDate === nextServiceDate ? (old.notifiedThresholds || []) : []
+    };
+
+    try { await dbPut('maintenance', record); closeModal(); await render(); }
+    catch (err) { console.error(err); alert(`Could not save maintenance item: ${err.message || err}`); }
   });
-
-  /* =========================
-     ITEM TYPE
-  ========================== */
-
-  document
-    .getElementById('typeSelect')
-    .addEventListener('change', e => {
-
-      document.getElementById(
-        'customNameField'
-      ).style.display =
-        e.target.value === 'Other'
-          ? ''
-          : 'none';
-
-    });
-
-  /* =========================
-     CANCEL
-  ========================== */
-
-  document
-    .getElementById('cancelBtn')
-    .addEventListener('click', closeModal);
-
-  /* =========================
-     DELETE
-  ========================== */
-
-  document
-    .getElementById('deleteBtn')
-    ?.addEventListener('click', async () => {
-
-      if (!confirm('Delete this maintenance item?')) {
-        return;
-      }
-
-      try {
-
-        await dbDelete('maintenance', m.id);
-
-        closeModal();
-
-        await render();
-
-      } catch (error) {
-
-        alert(
-          `Could not delete item: ${
-            error.message || error
-          }`
-        );
-
-      }
-
-    });
-
-  /* =========================
-     SAVE
-  ========================== */
-
-  document
-    .getElementById('maintForm')
-    .addEventListener('submit', async e => {
-
-      e.preventDefault();
-
-      const fd = new FormData(e.target);
-
-      const type = fd.get('type');
-
-      const lastServiceDate =
-        fd.get('lastServiceDate');
-
-      const nextServiceDate =
-        fd.get('nextServiceDate');
-
-      const cost = fd.get('cost');
-
-      const todayDate =
-        new Date(`${today}T00:00:00`);
-
-      /* -------------------------
-         Validate last service date
-      ------------------------- */
-
-      if (lastServiceDate) {
-
-        const lastDate =
-          new Date(`${lastServiceDate}T00:00:00`);
-
-        if (lastDate > todayDate) {
-
-          alert(
-            'Last serviced date cannot be in the future.'
-          );
-
-          return;
-        }
-
-      }
-
-      /* -------------------------
-         Validate next service date
-      ------------------------- */
-
-      if (!nextServiceDate) {
-
-        alert(
-          'Please select a service due date.'
-        );
-
-        return;
-      }
-
-      const nextDate =
-        new Date(`${nextServiceDate}T00:00:00`);
-
-      if (nextDate < todayDate) {
-
-        alert(
-          'Service due date cannot be in the past.'
-        );
-
-        return;
-      }
-
-      if (lastServiceDate) {
-
-        const lastDate =
-          new Date(`${lastServiceDate}T00:00:00`);
-
-        if (nextDate <= lastDate) {
-
-          alert(
-            'Service due date must be after the last serviced date.'
-          );
-
-          return;
-        }
-
-      }
-
-      /* -------------------------
-         Validate cost
-      ------------------------- */
-
-      if (
-        cost !== '' &&
-        Number(cost) < 0
-      ) {
-
-        alert(
-          'Service cost cannot be negative.'
-        );
-
-        return;
-      }
-
-      /* -------------------------
-         Determine reminder
-      ------------------------- */
-
-      let selectedReminder = null;
-
-      const selectedPreset =
-        reminderChips.find(
-          chip =>
-            chip.classList.contains('on')
-        );
-
-      if (selectedPreset) {
-
-        selectedReminder =
-          Number(selectedPreset.dataset.val);
-
-      } else if (
-        customReminderBtn.classList.contains('on')
-      ) {
-
-        const customDays =
-          Number(customReminderInput.value);
-
-        if (
-          !Number.isInteger(customDays) ||
-          customDays < 1 ||
-          customDays > 365
-        ) {
-
-          alert(
-            'Please enter a custom reminder between 1 and 365 days.'
-          );
-
-          customReminderInput.focus();
-
-          return;
-        }
-
-        selectedReminder = customDays;
-      }
-
-      /*
-       * No reminder is perfectly valid.
-       *
-       * [] = customer doesn't want a reminder.
-       */
-
-      const reminders =
-        selectedReminder === null
-          ? []
-          : [selectedReminder];
-
-      /* -------------------------
-         Item name
-      ------------------------- */
-
-      const itemName =
-        type === 'Other'
-          ? String(
-              fd.get('itemName') || ''
-            ).trim() || 'Other item'
-          : type;
-
-      /* -------------------------
-         Record
-      ------------------------- */
-
-      const record = {
-
-        id: m.id,
-
-        type,
-
-        itemName,
-
-        lastServiceDate:
-          lastServiceDate || null,
-
-        nextServiceDate,
-
-        cost:
-          cost === ''
-            ? null
-            : Number(cost),
-
-        reminders,
-
-        notes:
-          String(
-            fd.get('notes') || ''
-          ).trim(),
-
-        createdAt:
-          m.createdAt,
-
-        notifiedThresholds:
-          isEdit &&
-          m.nextServiceDate === nextServiceDate
-            ? (m.notifiedThresholds || [])
-            : []
-
-      };
-
-      try {
-
-        await dbPut(
-          'maintenance',
-          record
-        );
-
-        closeModal();
-
-        await render();
-
-      } catch (error) {
-
-        console.error(error);
-
-        alert(
-          `Could not save maintenance item: ${
-            error.message || error
-          }`
-        );
-
-      }
-
-    });
 }
-
 
 /* ---------------- Detail view ---------------- */
 function openDetail(kind, item) {
@@ -1276,7 +1059,8 @@ function openDetail(kind, item) {
   }
   const rows = kind === 'document' ? `
     <div class="detail-row"><span class="k">Category</span><span>${escapeHTML(item.category)}</span></div>
-    <div class="detail-row"><span class="k">Expiry date</span><span>${fmtDate(item.expiryDate)}</span></div>
+    <div class="detail-row"><span class="k">Issue date</span><span>${fmtDate(item.issueDate)}</span></div>
+    <div class="detail-row"><span class="k">Expiry date</span><span>${item.expiryDate ? fmtDate(item.expiryDate) : 'No expiry'}</span></div>
     <div class="detail-row"><span class="k">Status</span><span class="card-chip chip-${cls}">${daysLabel(days)}</span></div>
     <div class="detail-row"><span class="k">Reminders</span><span>${(item.reminders||[]).join(', ') || 'None'} days before</span></div>
     ${item.notes ? `<div class="detail-row"><span class="k">Notes</span><span style="text-align:right;max-width:65%">${escapeHTML(item.notes)}</span></div>` : ''}
@@ -1373,7 +1157,7 @@ async function checkReminders() {
     const notified = m.notifiedThresholds || [];
     for (const t of reminders) {
       if (days <= t && !notified.includes(t)) {
-        await notify('Maintenance due', `${m.itemName} service due ${fmtDate(m.nextServiceDate)} (${daysLabel(days)}).`, `maint-${m.id}-${t}`);
+        await notify('Maintenance due', `${m.itemName} Maintenance ${fmtDate(m.nextServiceDate)} (${daysLabel(days)}).`, `maint-${m.id}-${t}`);
         notified.push(t);
       }
     }
