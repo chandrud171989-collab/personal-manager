@@ -54,3 +54,14 @@ PERSONAL MANAGER - PRIVATE DOCUMENT STORAGE
 8. The app caches the non-extractable CryptoKey locally in IndexedDB for convenience on that device.
 9. The current password-reset flow can reset the Supabase account password, but a password reset on a new device cannot unlock an existing encrypted vault without the old password. A future recovery-key flow should be added before production if password recovery must also recover encrypted documents.
 
+Document form updates:
+- Issue date is optional.
+- Expiry date is optional.
+- Added No expiry option.
+- Reminder is not selected by default.
+- Customer can select only one reminder: 30, 7, or 1 day.
+- No expiry automatically clears/disables reminders.
+- Maintenance form remains unchanged.
+
+Run document_reminder_setup.sql once in Supabase SQL Editor before testing, so the selected reminder is saved per document.
+Replace the existing app.js with app.js from this folder.

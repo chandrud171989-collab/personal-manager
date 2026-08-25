@@ -635,6 +635,7 @@ function documentToDb(doc) {
     name: doc.name || '',
     issue_date: doc.issueDate || null,
     expiry_date: doc.expiryDate || null,
+    reminder_days: Array.isArray(doc.reminders) && doc.reminders.length ? doc.reminders[0] : null,
     notes: doc.notes || null,
     file_path: doc.filePath || null,
     file_name: doc.fileName || null,
@@ -652,7 +653,7 @@ function documentFromDb(row) {
     category: row.category || 'Other',
     issueDate: row.issue_date || '',
     expiryDate: row.expiry_date || '',
-    reminders: [30, 7, 1],
+    reminders: row.reminder_days ? [Number(row.reminder_days)] : [],
     notes: row.notes || '',
     filePath: row.file_path || null,
     fileName: row.file_name || null,
@@ -1021,7 +1022,7 @@ function cardHTML(item) {
   const cls = statusClass(days);
   const title = isDocument ? item.name : (item.itemName || item.type || 'Maintenance item');
   const sub = isDocument
-    ? `${item.category || 'Document'} · expires ${fmtDate(item.expiryDate)}`
+    ? `${item.category || 'Document'} · ${item.expiryDate ? `expires ${fmtDate(item.expiryDate)}` : 'no expiry'}`
     : `${item.type || 'Maintenance'} · next service ${fmtDate(item.nextServiceDate)}`;
 
   return `
@@ -1411,7 +1412,7 @@ function openDocumentForm(existing) {
   const isEdit = Boolean(existing);
   const d = existing || {
     id: crypto.randomUUID(),
-    reminders: [30, 7, 1],
+    reminders: [],
     notifiedThresholds: []
   };
 
@@ -1439,10 +1440,14 @@ function openDocumentForm(existing) {
 
       <div class="field">
         <label>Expiry date</label>
-        <input type="date" name="expiryDate" required value="${d.expiryDate || ''}">
+        <input type="date" name="expiryDate" id="documentExpiryDate" value="${d.expiryDate || ''}">
+        <label style="display:flex;align-items:center;gap:10px;margin-top:10px;font-weight:500;cursor:pointer;">
+          <input type="checkbox" id="noExpiry" name="noExpiry" ${!d.expiryDate ? 'checked' : ''} style="width:auto;">
+          <span>No expiry</span>
+        </label>
       </div>
 
-      <div class="field">
+      <div class="field" id="documentReminderField">
         <label>Remind me before expiry</label>
         <div class="chip-row" id="reminderChips">
           ${REMINDER_OPTIONS.map(n => `
@@ -1451,6 +1456,7 @@ function openDocumentForm(existing) {
             </button>
           `).join('')}
         </div>
+        <small>Select one reminder option.</small>
       </div>
 
       <div class="field">
@@ -1482,7 +1488,40 @@ function openDocumentForm(existing) {
   `);
 
   const chips = [...document.querySelectorAll('#reminderChips .chip-toggle')];
-  chips.forEach(chip => chip.addEventListener('click', () => chip.classList.toggle('on')));
+  const expiryInput = document.getElementById('documentExpiryDate');
+  const noExpiry = document.getElementById('noExpiry');
+  const reminderField = document.getElementById('documentReminderField');
+
+  function syncDocumentExpiryUI() {
+    const disabled = noExpiry?.checked === true;
+    if (expiryInput) {
+      expiryInput.disabled = disabled;
+      if (disabled) expiryInput.value = '';
+    }
+    if (reminderField) reminderField.style.opacity = disabled ? '0.5' : '1';
+    chips.forEach(chip => { chip.disabled = disabled; });
+    if (disabled) chips.forEach(chip => chip.classList.remove('on'));
+  }
+
+  chips.forEach(chip => chip.addEventListener('click', () => {
+    if (noExpiry?.checked) return;
+    chips.forEach(other => other.classList.remove('on'));
+    chip.classList.add('on');
+  }));
+
+  noExpiry?.addEventListener('change', () => {
+    if (!noExpiry.checked && expiryInput && !expiryInput.value) expiryInput.focus();
+    syncDocumentExpiryUI();
+  });
+
+  expiryInput?.addEventListener('input', () => {
+    if (expiryInput.value) {
+      noExpiry.checked = false;
+      syncDocumentExpiryUI();
+    }
+  });
+
+  syncDocumentExpiryUI();
 
   const fileInput = document.getElementById('documentFile');
   const selectedFileName = document.getElementById('selectedFileName');
@@ -1561,8 +1600,8 @@ function openDocumentForm(existing) {
     saveBtn.textContent = selectedFile ? 'Encrypting & Saving...' : 'Saving...';
 
     const fd = new FormData(e.target);
-    const expiryDate = fd.get('expiryDate');
-    const issueDate = fd.get('issueDate');
+    const expiryDate = fd.get('noExpiry') ? null : (fd.get('expiryDate') || null);
+    const issueDate = fd.get('issueDate') || null;
 
     if (issueDate && expiryDate && issueDate > expiryDate) {
       saveBtn.disabled = false;
@@ -1581,7 +1620,7 @@ function openDocumentForm(existing) {
       category: fd.get('category'),
       issueDate: issueDate || null,
       expiryDate,
-      reminders,
+      reminders: expiryDate ? reminders.slice(0, 1) : [],
       notes: String(fd.get('notes') || '').trim(),
       filePath: removeExistingFile ? null : d.filePath || null,
       fileName: removeExistingFile ? null : d.fileName || null,
@@ -1591,10 +1630,10 @@ function openDocumentForm(existing) {
       notifiedThresholds: isEdit && d.expiryDate === expiryDate ? (d.notifiedThresholds || []) : []
     };
 
-    if (!record.name || !expiryDate) {
+    if (!record.name) {
       saveBtn.disabled = false;
       saveBtn.textContent = originalSaveText;
-      alert('Please enter the document name and expiry date.');
+      alert('Please enter the document name.');
       return;
     }
 
@@ -1824,7 +1863,8 @@ function openDetail(kind, item) {
     <div class="detail-row"><span class="k">Category</span><span>${escapeHTML(item.category)}</span></div>
     ${item.documentNumber ? `<div class="detail-row"><span class="k">Number</span><span>${escapeHTML(item.documentNumber)}</span></div>` : ''}
     ${item.issueDate ? `<div class="detail-row"><span class="k">Issue date</span><span>${fmtDate(item.issueDate)}</span></div>` : ''}
-    <div class="detail-row"><span class="k">Expiry date</span><span>${fmtDate(item.expiryDate)}</span></div>
+    <div class="detail-row"><span class="k">Expiry date</span><span>${item.expiryDate ? fmtDate(item.expiryDate) : 'No expiry'}</span></div>
+    ${item.expiryDate && item.reminders?.length ? `<div class="detail-row"><span class="k">Reminder</span><span>${item.reminders[0]} day${item.reminders[0] > 1 ? 's' : ''} before expiry</span></div>` : ''}
     <div class="detail-row"><span class="k">Status</span><span class="card-chip chip-${cls}">${daysLabel(days)}</span></div>
     ${item.notes ? `<div class="detail-row"><span class="k">Notes</span><span style="text-align:right;max-width:65%">${escapeHTML(item.notes)}</span></div>` : ''}
   ` : `
