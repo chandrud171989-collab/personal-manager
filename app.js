@@ -31,7 +31,7 @@ function updateAuthUI(user) {
   }
 
   if (fab) {
-    fab.classList.toggle('hidden', !user || state.view === 'dashboard');
+    fab.classList.toggle('hidden', !user || state.view === 'dashboard' || state.view === 'finance');
   }
 
   let logoutBtn = document.getElementById('logoutBtn');
@@ -468,7 +468,7 @@ const fab = document.getElementById('fab');
 function setView(view) {
   state.view = view;
   document.querySelectorAll('.navbtn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
-  fab.classList.toggle('hidden', view === 'dashboard');
+  fab.classList.toggle('hidden', view === 'dashboard' || view === 'finance');
   render();
 }
 
@@ -1092,38 +1092,19 @@ function renderFinance() {
         <div id="emiResult"></div>
       </div>
 
-      <div class="finance-card">
-        <h2>📊 Monthly Loan Summary</h2>
-
-        <div class="field">
-          <label>Home Loan EMI (₹)</label>
-          <input type="number" id="homeLoanEMI" placeholder="Example: 47000">
-        </div>
-
-        <div class="field">
-          <label>Personal Loan EMI (₹)</label>
-          <input type="number" id="personalLoanEMI" placeholder="Example: 22000">
-        </div>
-
-        <div class="field">
-          <label>Car Loan EMI (₹)</label>
-          <input type="number" id="carLoanEMI" placeholder="Example: 31000">
-        </div>
-
-        <button type="button" class="btn primary finance-calculate" id="calculateLoanBtn">Calculate Total EMI</button>
-        <div id="loanTotalResult"></div>
-      </div>
 
     </div>
   `;
 
-  document.getElementById('addFinanceExpenseBtn').addEventListener('click', () => openFinanceExpenseForm());
+  const addExpenseBtn = document.getElementById('addFinanceExpenseBtn');
+  if (addExpenseBtn) {
+    addExpenseBtn.onclick = () => openFinanceExpenseForm(null);
+  }
   document.getElementById('viewFinanceBtn').addEventListener('click', renderFinanceSummary);
   document.getElementById('financeFromDate').addEventListener('change', renderFinanceSummary);
   document.getElementById('financeToDate').addEventListener('change', renderFinanceSummary);
 
   document.getElementById('calculateEMIBtn').addEventListener('click', calculateEMI);
-  document.getElementById('calculateLoanBtn').addEventListener('click', calculateLoanTotal);
 
   renderFinanceSummary();
 }
