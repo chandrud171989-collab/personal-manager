@@ -305,6 +305,10 @@ function documentToDb(doc) {
     expiry_date: doc.expiryDate || null,
     reminder_days: Array.isArray(doc.reminders) && doc.reminders.length ? Math.min(...doc.reminders) : 30,
     notes: doc.notes || null,
+    file_name: doc.fileName || null,
+    file_type: doc.fileType || null,
+    file_path: doc.filePath || null,
+    file_size: doc.fileSize || null,
     created_at: doc.createdAt || undefined,
     updated_at: new Date().toISOString()
   };
@@ -322,10 +326,10 @@ function documentFromDb(row) {
     notes: row.notes || '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    // Actual file attachment will be implemented with Supabase Storage.
-    fileName: null,
-    fileType: null,
-    fileBlob: null,
+    fileName: row.file_name || null,
+    fileType: row.file_type || null,
+    filePath: row.file_path || null,
+    fileSize: row.file_size || null,
     notifiedThresholds: []
   };
 }
@@ -371,6 +375,87 @@ function maintenanceFromDb(row) {
     updatedAt: row.updated_at,
     notifiedThresholds: []
   };
+}
+
+const STORAGE_BUCKET = 'documents';
+const MAX_DOCUMENT_FILE_SIZE = 6 * 1024 * 1024;
+const ALLOWED_DOCUMENT_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png']);
+
+function sanitizeFileName(name) {
+  return String(name || 'file')
+    .replace(/[^a-zA-Z0-9._-]+/g, '_')
+    .replace(/^\.+/, '')
+    .slice(0, 120) || 'file';
+}
+
+function validateDocumentFile(file) {
+  if (!file) return;
+  if (!ALLOWED_DOCUMENT_TYPES.has(file.type)) {
+    throw new Error('Only PDF, JPG, JPEG and PNG files are allowed.');
+  }
+  if (file.size > MAX_DOCUMENT_FILE_SIZE) {
+    throw new Error('File size must be 6 MB or less.');
+  }
+}
+
+function documentStoragePath(documentId, fileName) {
+  return `${currentUser.id}/${documentId}/${sanitizeFileName(fileName)}`;
+}
+
+async function uploadDocumentFile(file, documentId) {
+  const client = getSupabase();
+  if (!client || !currentUser) throw new Error('You are not logged in.');
+  validateDocumentFile(file);
+
+  const path = documentStoragePath(documentId, file.name);
+  const { error } = await client.storage
+    .from(STORAGE_BUCKET)
+    .upload(path, file, {
+      contentType: file.type,
+      upsert: false
+    });
+
+  if (error) {
+    console.error('Document upload error:', error);
+    throw new Error(`Could not upload file: ${error.message}`);
+  }
+
+  return {
+    fileName: file.name,
+    fileType: file.type,
+    filePath: path,
+    fileSize: file.size
+  };
+}
+
+async function deleteDocumentFile(filePath) {
+  if (!filePath) return;
+  const client = getSupabase();
+  if (!client) return;
+
+  const { error } = await client.storage
+    .from(STORAGE_BUCKET)
+    .remove([filePath]);
+
+  if (error) {
+    console.warn('Storage delete warning:', error);
+  }
+}
+
+async function getDocumentFileUrl(filePath) {
+  const client = getSupabase();
+  if (!client || !filePath) return null;
+
+  const { data, error } = await client.storage
+    .from(STORAGE_BUCKET)
+    .createSignedUrl(filePath, 60 * 10);
+
+  if (error) {
+    console.error('Signed URL error:', error);
+    throw new Error(`Could not open file: ${error.message}`);
+  }
+
+  return data?.signedUrl || null;
 }
 
 async function dbGetAll(table) {
@@ -432,6 +517,20 @@ async function dbDelete(table, id) {
   const client = getSupabase();
   if (!client || !currentUser) throw new Error('You are not logged in.');
 
+  let filePath = null;
+
+  if (table === 'documents') {
+    const { data: existing, error: readError } = await client
+      .from('documents')
+      .select('file_path')
+      .eq('id', id)
+      .eq('user_id', currentUser.id)
+      .maybeSingle();
+
+    if (readError) throw readError;
+    filePath = existing?.file_path || null;
+  }
+
   const { error } = await client
     .from(table)
     .delete()
@@ -441,6 +540,10 @@ async function dbDelete(table, id) {
   if (error) {
     console.error(`${table} delete error:`, error);
     throw error;
+  }
+
+  if (table === 'documents' && filePath) {
+    await deleteDocumentFile(filePath);
   }
 }
 
@@ -1123,8 +1226,11 @@ function openDocumentForm(existing) {
       <div class="field">
         <label>Photo / PDF</label>
         <div class="filepick">
-          <span class="filepick-name" id="fileName">File upload will be enabled with Supabase Storage</span>
+          <span class="filepick-name" id="fileName">${escapeHTML(d.fileName || 'No file attached')}</span>
+          <button type="button" class="filepick-btn" id="filePickBtn">Choose</button>
+          <input type="file" id="fileInput" accept="application/pdf,image/jpeg,image/png" hidden>
         </div>
+        <small>PDF, JPG or PNG · Maximum 6 MB</small>
       </div>
 
       <div class="modal-actions">
@@ -1138,6 +1244,28 @@ function openDocumentForm(existing) {
   const chips = [...document.querySelectorAll('#reminderChips .chip-toggle')];
   chips.forEach(chip => {
     chip.addEventListener('click', () => chip.classList.toggle('on'));
+  });
+
+  const fileInput = document.getElementById('fileInput');
+  const filePickBtn = document.getElementById('filePickBtn');
+  const fileNameEl = document.getElementById('fileName');
+  let selectedFile = null;
+
+  filePickBtn?.addEventListener('click', () => fileInput?.click());
+
+  fileInput?.addEventListener('change', () => {
+    const file = fileInput.files?.[0] || null;
+    if (!file) return;
+
+    try {
+      validateDocumentFile(file);
+      selectedFile = file;
+      fileNameEl.textContent = file.name;
+    } catch (error) {
+      selectedFile = null;
+      fileInput.value = '';
+      alert(error.message);
+    }
   });
 
   document.getElementById('cancelBtn').addEventListener('click', closeModal);
@@ -1189,7 +1317,28 @@ function openDocumentForm(existing) {
     }
 
     try {
+      let uploaded = null;
+
+      if (selectedFile) {
+        uploaded = await uploadDocumentFile(selectedFile, record.id);
+        record.fileName = uploaded.fileName;
+        record.fileType = uploaded.fileType;
+        record.filePath = uploaded.filePath;
+        record.fileSize = uploaded.fileSize;
+      } else if (isEdit) {
+        record.fileName = d.fileName || null;
+        record.fileType = d.fileType || null;
+        record.filePath = d.filePath || null;
+        record.fileSize = d.fileSize || null;
+      }
+
       await dbPut('documents', record);
+
+      // If a new file replaced an old one, remove the old storage object.
+      if (uploaded && isEdit && d.filePath && d.filePath !== uploaded.filePath) {
+        await deleteDocumentFile(d.filePath);
+      }
+
       closeModal();
       await render();
     } catch (error) {
@@ -1390,6 +1539,7 @@ function openDetail(kind, item) {
     ${item.issueDate ? `<div class="detail-row"><span class="k">Issue date</span><span>${fmtDate(item.issueDate)}</span></div>` : ''}
     <div class="detail-row"><span class="k">Expiry date</span><span>${fmtDate(item.expiryDate)}</span></div>
     <div class="detail-row"><span class="k">Status</span><span class="card-chip chip-${cls}">${daysLabel(days)}</span></div>
+    ${item.fileName ? `<div class="detail-row"><span class="k">Attachment</span><span style="text-align:right;max-width:65%">${escapeHTML(item.fileName)}</span></div>` : ''}
     ${item.notes ? `<div class="detail-row"><span class="k">Notes</span><span style="text-align:right;max-width:65%">${escapeHTML(item.notes)}</span></div>` : ''}
   ` : `
     <div class="detail-row"><span class="k">Type</span><span>${escapeHTML(item.type)}</span></div>
@@ -1405,11 +1555,31 @@ function openDetail(kind, item) {
     ${rows}
     <div class="modal-actions">
       <button type="button" class="btn" id="closeDetailBtn">Close</button>
+      ${kind === 'document' && item.filePath ? '<button type="button" class="btn" id="viewFileBtn">View file</button>' : ''}
       <button type="button" class="btn primary" id="editBtn">Edit</button>
     </div>
   `);
 
   document.getElementById('closeDetailBtn').addEventListener('click', closeModal);
+
+  document.getElementById('viewFileBtn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('viewFileBtn');
+    if (!item.filePath) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Opening...';
+
+    try {
+      const url = await getDocumentFileUrl(item.filePath);
+      if (!url) throw new Error('File URL could not be created.');
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      alert(error.message || 'Could not open file.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'View file';
+    }
+  });
   document.getElementById('editBtn').addEventListener('click', () => {
     closeModal();
     if (kind === 'document') openDocumentForm(item);
