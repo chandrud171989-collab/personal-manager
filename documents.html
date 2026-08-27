@@ -1,26 +1,34 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#12151a">
 <title>Documents - Personal Manager</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
-<link rel="stylesheet" href="css/style.css">
+<link rel="apple-touch-icon" href="icon-192.png">
+<!-- IMPORTANT: use the same root stylesheet as the existing app -->
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="app">
   <header class="topbar">
-    <div class="topbar-brand"><span class="brand-mark"></span><span class="brand-name">Personal Manager</span></div>
+    <div class="topbar-brand">
+      <span class="brand-mark"></span>
+      <span class="brand-name">Personal Manager</span>
+    </div>
     <div class="topbar-actions">
-      <button id="notifPermBtn" class="icon-btn" type="button" title="Enable notifications">🔔</button>
-      <button id="logoutBtn" class="logout-btn" type="button" title="Logout">↪ <span>Logout</span></button>
+      <button id="notifPermBtn" class="icon-btn" type="button" title="Enable notifications" aria-label="Enable notifications">🔔</button>
+      <button id="logoutBtn" class="logout-btn" type="button" title="Logout"><span class="logout-icon">↪</span><span>Logout</span></button>
     </div>
   </header>
 
   <main id="view" class="view"></main>
-  <button id="fab" class="fab" type="button" aria-label="Add new">+</button>
+
+  <button id="fab" class="fab" type="button" aria-label="Add new">
+    <span aria-hidden="true">+</span>
+  </button>
 
   <nav class="bottomnav">
     <a class="navbtn" href="index.html">▦<span>Dashboard</span></a>
@@ -33,27 +41,7 @@
 <div id="modalRoot"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-/* Load the existing Supabase config without assuming whether the project keeps it
-   at the repository root or under /js. This avoids changing the rest of the app. */
-(function loadConfig(candidates, done) {
-  if (!candidates.length) { done(); return; }
-  var src = candidates.shift();
-  var s = document.createElement('script');
-  s.src = src + '?v=20260827';
-  s.onload = function () {
-    try {
-      if ((typeof supabaseClient !== 'undefined' && supabaseClient?.from) || window.supabaseClient?.from) { done(); return; }
-    } catch (_) {}
-    loadConfig(candidates, done);
-  };
-  s.onerror = function () { loadConfig(candidates, done); };
-  document.head.appendChild(s);
-})(['supabase-config.js','js/supabase-config.js'], function () {
-  var s = document.createElement('script');
-  s.src = 'documents.js?v=20260827-cloud2';
-  document.body.appendChild(s);
-});
-</script>
+<script src="supabase-config.js?v=20260827"></script>
+<script src="documents.js?v=20260827-v3"></script>
 </body>
 </html>

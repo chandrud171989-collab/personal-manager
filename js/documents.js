@@ -5,6 +5,9 @@
  */
 
 const STORAGE_BUCKET = 'documents';
+
+// Cloud Documents build
+window.DOCUMENTS_CLOUD_BUILD = '2026-08-27-v3';
 const MAX_FILE_SIZE = 6 * 1024 * 1024;
 const DOC_CATEGORIES = ['Aadhaar','PAN','ID /Driving License','Passport','Voter ID','Warranty','Vehicle RC','Subscription','Property','Education Certificate','Other'];
 
@@ -231,4 +234,16 @@ function bindPage(){
   renderDocuments();
 }
 
-document.addEventListener('DOMContentLoaded',bindPage);
+window.openDocumentForm = openDocumentForm;
+window.renderDocuments = renderDocuments;
+window.bindDocumentsPage = bindPage;
+
+function bootDocumentsPage(){
+  try { bindPage(); } catch (e) {
+    console.error('Documents boot error:', e);
+    const v = document.getElementById('view');
+    if (v) v.innerHTML = `<div class="empty">Unable to start Documents.<br><small>${esc(e.message || String(e))}</small></div>`;
+  }
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootDocumentsPage);
+else bootDocumentsPage();
