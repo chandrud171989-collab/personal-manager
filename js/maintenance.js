@@ -268,13 +268,105 @@
     catch(e){document.getElementById("expenseResults").innerHTML=`<div class="error">${PM.escape(e.message||e)}</div>`;}
   }
 
-  function downloadXLS(){
-    const raw=document.getElementById("downloadExpenses").dataset.rows;if(!raw)return;
-    const {rows}=JSON.parse(raw);
-    const html=`<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:Arial}table{border-collapse:collapse}th,td{border:1px solid #999;padding:7px 10px}</style></head><body><h1>Personal Manager - Maintenance Expenses</h1><table><tr><th>Date</th><th>Item</th><th>Amount</th><th>Notes</th></tr>${rows.map(r=>`<tr><td>${PM.escape(r.service_date||"")}</td><td>${PM.escape(r.item_name||"Other item")}</td><td>${Number(r.amount||0).toFixed(2)}</td><td>${PM.escape(r.notes||"")}</td></tr>`).join("")}</table></body></html>`;
-    const blob=new Blob([html],{type:"application/vnd.ms-excel"}),url=URL.createObjectURL(blob),a=document.createElement("a");
-    a.href=url;a.download=`maintenance-expenses.xls`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  function downloadXLS() {
+  const raw = document.getElementById("downloadExpenses")?.dataset.rows;
+
+  if (!raw) {
+    alert("Please click View Expenses first.");
+    return;
   }
+
+  let rows;
+
+  try {
+    rows = JSON.parse(raw).rows || [];
+  } catch (error) {
+    console.error("Excel export data error:", error);
+    alert("Unable to prepare the Excel file.");
+    return;
+  }
+
+  if (!rows.length) {
+    alert("No expenses available to download.");
+    return;
+  }
+
+  const tableRows = rows.map(row => `
+    <tr>
+      <td>${PM.escape(row.service_date || "")}</td>
+      <td>${PM.escape(row.item_name || "Other item")}</td>
+      <td>${Number(row.amount || 0).toFixed(2)}</td>
+      <td>${PM.escape(row.notes || "")}</td>
+    </tr>
+  `).join("");
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+body {
+  font-family: Arial, sans-serif;
+}
+h1 {
+  font-size: 20px;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+th, td {
+  border: 1px solid #999;
+  padding: 8px;
+}
+th {
+  font-weight: bold;
+}
+</style>
+</head>
+<body>
+
+<h1>Personal Manager - Maintenance Expenses</h1>
+
+<table>
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Item</th>
+      <th>Amount (₹)</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+
+  <tbody>
+    ${tableRows}
+  </tbody>
+</table>
+
+</body>
+</html>`;
+
+  const blob = new Blob(
+    [`\ufeff${html}`],
+    { type: "application/vnd.ms-excel;charset=utf-8" }
+  );
+
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "maintenance-expenses.xls";
+  link.style.display = "none";
+
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 2000);
+}
 
   async function start(){
     try{
