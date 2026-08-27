@@ -196,23 +196,39 @@ function form(old=null){
         path=uploadedPath;
       }
 
-      const record={
+      const record = {
         id,
-        user_id:u.id,
-        document_name:name,
-        document_type:String(fd.get('category')||'Other'),
-        document_number:old?.document_number||null,
-        issue_date:issue,
-        expiry_date:expiry,
-        reminder_days:reminder,
-        notes:String(fd.get('notes')||'').trim()||null,
-        file_path:path,
-        file_name:file?file.name:(old?.file_name||null),
-        file_type:file?file.type:(old?.file_type||null),
-        file_size:file?file.size:(old?.file_size||null),
-        updated_at:new Date().toISOString()
-      };
-      if(!edit)record.created_at=new Date().toISOString();
+        user_id: u.id,
+
+        // Existing document columns
+        name: name,
+        category: String(fd.get('category') || 'Other'),
+        issue_date: issue || null,
+        expiry_date: expiry || null,
+        notes: String(fd.get('notes') || '').trim() || null,
+
+        // Existing reminder column
+        reminders: reminder === null ? [] : [reminder],
+
+        // Keep notification history
+        notified_thresholds:
+            edit && old?.expiry_date === expiry
+            ? (old?.notified_thresholds || [])
+            : [],
+
+        // New Supabase Storage metadata
+        file_path: path || (old?.file_path || null),
+        file_name: file ? file.name : (old?.file_name || null),
+        file_type: file ? file.type : (old?.file_type || null),
+        file_size: file ? file.size : (old?.file_size || null),
+
+        updated_at: new Date().toISOString()
+        };
+
+        if (!edit) {
+        record.created_at = new Date().toISOString();
+        }
+            if(!edit)record.created_at=new Date().toISOString();
 
       const {error}=await client().from('documents').upsert(record,{onConflict:'id'});
       if(error)throw error;
