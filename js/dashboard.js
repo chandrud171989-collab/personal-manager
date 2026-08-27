@@ -4,7 +4,13 @@
   const view = document.getElementById("view");
 
   async function dbAll(table) {
-    const { data, error } = await PM.client.from(table).select("*").eq("user_id", PM.user.id).order("created_at", { ascending: false });
+    const columns = table === "documents"
+      ? "id,name,category,issue_date,expiry_date,created_at"
+      : "id,item_name,category,next_service_date,created_at";
+    const { data, error } = await PM.client.from(table)
+      .select(columns)
+      .eq("user_id", PM.user.id)
+      .order("created_at", { ascending: false });
     if (error) throw error;
     return data || [];
   }

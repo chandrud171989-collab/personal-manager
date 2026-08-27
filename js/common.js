@@ -69,20 +69,24 @@
   };
 
   PM.requireAuth = async () => {
-    if (!PM.client) {
-      throw new Error("Supabase client is not initialized.");
-    }
+    if (!PM.client) throw new Error("Supabase client is not initialized.");
+
     const { data, error } = await PM.client.auth.getSession();
     if (error) throw error;
-    if (!data.session?.user) {
+
+    const user = data.session?.user;
+    if (!user) {
       location.href = "login.html";
       throw new Error("Authentication session missing.");
     }
-    PM.user = data.session.user;
+
+    PM.user = user;
+
     if (!PM.documentKey) {
-      try { await PM.restoreDocumentKey(PM.user.id); } catch (_) {}
+      try { await PM.restoreDocumentKey(user.id); } catch (_) {}
     }
-    return PM.user;
+
+    return user;
   };
 
   PM.logout = async () => {
@@ -262,10 +266,11 @@
 
   PM.initPage = async (page) => {
     await PM.requireAuth();
+
+    const active = document.querySelector(`.navbtn[data-page="${page}"]`);
+    if (active) active.classList.add("active");
+
     PM.setupHeader();
-    document.querySelectorAll(".navbtn").forEach((a) => {
-      a.classList.toggle("active", a.dataset.page === page);
-    });
   };
 
   window.addEventListener("load", () => {

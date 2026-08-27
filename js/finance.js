@@ -3,18 +3,6 @@
   const PM = window.PM;
   const view = document.getElementById("view");
 
-  async function loadHomeExpenses() {
-    const { data, error } = await PM.client.from("finance_expenses").select("*").eq("user_id",PM.user.id).order("expense_date",{ascending:false});
-    if(error) throw error;
-    return data||[];
-  }
-
-  async function loadMaintenanceExpenses() {
-    const { data, error } = await PM.client.from("maintenance_expenses").select("item_name,amount,service_date,notes").eq("user_id",PM.user.id).order("service_date",{ascending:false});
-    if(error) throw error;
-    return data||[];
-  }
-
   function render() {
     view.innerHTML = `
       <h1 class="page-title">Finance</h1>

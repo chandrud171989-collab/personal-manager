@@ -6,7 +6,11 @@
   const view = document.getElementById("view");
 
   async function load() {
-    const { data, error } = await PM.client.from("maintenance").select("*").eq("user_id", PM.user.id).order("created_at",{ascending:false});
+    const { data, error } = await PM.client
+      .from("maintenance")
+      .select("id,user_id,item_name,category,last_service_date,next_service_date,reminder_days,notes,created_at,updated_at")
+      .eq("user_id", PM.user.id)
+      .order("created_at",{ascending:false});
     if (error) throw error;
     return (data || []).map(row => {
       let cost = null;
@@ -30,13 +34,10 @@
         notes: item.notes || null,
         updated_at: new Date().toISOString()
       };
-      const { data: existing } = await PM.client.from("maintenance_expenses")
-        .select("id").eq("user_id",PM.user.id).eq("maintenance_id",item.id).eq("service_date",serviceDate).maybeSingle();
-      if (existing?.id) {
-        await PM.client.from("maintenance_expenses").update(payload).eq("id",existing.id).eq("user_id",PM.user.id);
-      } else {
-        await PM.client.from("maintenance_expenses").insert(payload);
-      }
+      const { error } = await PM.client
+        .from("maintenance_expenses")
+        .upsert(payload, { onConflict: "user_id,maintenance_id,service_date" });
+      if (error) throw error;
     } catch (e) {
       console.warn("Maintenance expense sync skipped:", e.message || e);
     }

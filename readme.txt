@@ -70,3 +70,16 @@ can access the derived key, so normal client-side/XSS risks still apply.
 If the customer changes/reset their account password, existing document keys
 may require a re-encryption/recovery flow. No password-change migration is
 implemented in this version.
+
+
+PERFORMANCE OPTIMIZATIONS - V3
+-------------------------------
+- Service worker only intercepts same-origin application files.
+- Supabase API/Storage and CDN requests are not cached/intercepted.
+- HTML uses network-first so new deployments appear quickly.
+- Static application assets use cache-first for fast repeat loads.
+- Dashboard queries select only columns it needs.
+- Maintenance expense synchronization uses a single upsert instead of a read + write.
+- Removed unused Finance initial query functions.
+- Normal login now derives the document encryption key exactly once.
+- Signup derives the key exactly once.
