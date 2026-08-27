@@ -23,9 +23,6 @@
     if (!["application/pdf","image/jpeg","image/png"].includes(file.type)) {
       throw new Error("Only PDF, JPG or PNG files are allowed.");
     }
-    if (!PM.documentKey) {
-      throw new Error("Document encryption is locked. Please log out and log in again.");
-    }
 
     const encrypted = await PM.encryptFile(file);
     const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -297,11 +294,13 @@
   async function start() {
     try {
       await PM.initPage("documents");
-      if (!PM.documentKey) {
-        view.innerHTML = '<div class="error">Document encryption is locked. Please log out and log in again before using Documents.</div>';
-        return;
+
+      const fab = document.getElementById("fab");
+
+      if (fab) {
+        fab.onclick = () => openForm();
       }
-      document.getElementById("fab").onclick = () => openForm();
+
       render(await load());
     } catch (e) {
       console.error(e);
