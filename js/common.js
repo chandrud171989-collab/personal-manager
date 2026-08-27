@@ -1,172 +1,276 @@
-/* Personal Manager - shared services */
-const APP_BUILD = 'multipage-v1';
-const DB_NAME = 'personalManagerDB';
-const DB_VERSION = 2;
+/* Personal Manager - shared code
+ * All pages use the same Supabase client/session.
+ */
+(() => {
+  "use strict";
 
-let currentUser = null;
+  const PM = window.PM = window.PM || {};
+  PM.client = window.supabaseClient;
 
-function escapeHTML(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
-function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
-function daysUntil(dateStr) {
-  if (!dateStr) return null;
-  const today = new Date(); today.setHours(0,0,0,0);
-  const target = new Date(dateStr + 'T00:00:00');
-  return Math.round((target - today) / 86400000);
-}
-function statusClass(days) {
-  if (days === null) return 'green';
-  if (days < 0 || days <= 7) return 'red';
-  if (days <= 30) return 'amber';
-  return 'green';
-}
-function daysLabel(days) {
-  if (days === null) return '—';
-  if (days < 0) return `${Math.abs(days)}d overdue`;
-  if (days === 0) return 'Today';
-  if (days === 1) return 'Tomorrow';
-  return `in ${days}d`;
-}
-function fmtDate(dateStr) {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
-}
-
-let dbPromise = new Promise((resolve, reject) => {
-  const req = indexedDB.open(DB_NAME, DB_VERSION);
-  req.onupgradeneeded = e => {
-    const db = e.target.result;
-    if (!db.objectStoreNames.contains('documents')) db.createObjectStore('documents', { keyPath:'id' });
-    if (!db.objectStoreNames.contains('maintenance')) db.createObjectStore('maintenance', { keyPath:'id' });
-    if (!db.objectStoreNames.contains('financeExpenses')) db.createObjectStore('financeExpenses', { keyPath:'id' });
+  PM.escape = (value) => {
+    const div = document.createElement("div");
+    div.textContent = value == null ? "" : String(value);
+    return div.innerHTML;
   };
-  req.onsuccess = () => resolve(req.result);
-  req.onerror = () => reject(req.error);
-});
-async function dbGetAll(store) {
-  const db = await dbPromise;
-  return new Promise((resolve,reject)=>{
-    const tx=db.transaction(store,'readonly'); const req=tx.objectStore(store).getAll();
-    req.onsuccess=()=>resolve(req.result); req.onerror=()=>reject(req.error);
-  });
-}
-async function dbPut(store,obj) {
-  const db=await dbPromise;
-  return new Promise((resolve,reject)=>{
-    const tx=db.transaction(store,'readwrite'); tx.objectStore(store).put(obj);
-    tx.oncomplete=()=>resolve(); tx.onerror=()=>reject(tx.error);
-  });
-}
-async function dbDelete(store,id) {
-  const db=await dbPromise;
-  return new Promise((resolve,reject)=>{
-    const tx=db.transaction(store,'readwrite'); tx.objectStore(store).delete(id);
-    tx.oncomplete=()=>resolve(); tx.onerror=()=>reject(tx.error);
-  });
-}
 
-function getModalRoot() {
-  let root=document.getElementById('modalRoot');
-  if(!root){ root=document.createElement('div'); root.id='modalRoot'; document.body.appendChild(root); }
-  return root;
-}
-function closeModal(){ getModalRoot().innerHTML=''; }
-function openModal(html){
-  const root=getModalRoot();
-  root.innerHTML=`<div class="modal-backdrop" id="backdrop"><div class="modal-sheet">${html}</div></div>`;
-  const backdrop=document.getElementById('backdrop');
-  backdrop?.addEventListener('click',e=>{ if(e.target===backdrop) closeModal(); });
-}
+  PM.money = (value) =>
+    Number(value || 0).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
 
-function pageUrl(name){ return name; }
-function goLogin(){ window.location.href = pageUrl('login.html'); }
-function goHome(){ window.location.href = pageUrl('index.html'); }
+  PM.dateISO = (value) => {
+    if (!value) return "";
+    return String(value).slice(0, 10);
+  };
 
-async function requireAuth() {
-  const client = window.supabaseClient;
-  if (!client) { alert('Supabase is not configured.'); goLogin(); return null; }
-  const {data,error}=await client.auth.getSession();
-  if(error || !data.session){ goLogin(); return null; }
-  currentUser=data.session.user;
-  const logout=document.getElementById('logoutBtn');
-  if(logout && !logout.dataset.bound){
-    logout.dataset.bound='1';
-    logout.addEventListener('click', logoutUser);
-  }
-  const notif=document.getElementById('notifPermBtn');
-  if(notif && !notif.dataset.bound){
-    notif.dataset.bound='1';
-    notif.addEventListener('click', requestNotifPermission);
-  }
-  client.auth.onAuthStateChange((event,session)=>{
-    if(!session){ currentUser=null; goLogin(); }
-    else currentUser=session.user;
-  });
-  return currentUser;
-}
-async function logoutUser(){
-  const client=window.supabaseClient;
-  if(client) { const {error}=await client.auth.signOut(); if(error){alert(error.message||'Unable to logout.'); return;} }
-  currentUser=null; goLogin();
-}
+  PM.dateText = (value) => {
+    if (!value) return "—";
+    const d = new Date(`${String(value).slice(0,10)}T00:00:00`);
+    return Number.isNaN(d.getTime())
+      ? String(value)
+      : d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  };
 
-async function requestNotifPermission(){
-  if(!('Notification' in window)){alert('Notifications are not supported in this browser.');return;}
-  const perm=await Notification.requestPermission();
-  if(perm==='granted') checkReminders();
-}
-async function notify(title,body,tag){
-  if(!('Notification' in window)||Notification.permission!=='granted') return;
-  try{
-    const reg=await navigator.serviceWorker.ready;
-    if(reg.active) reg.active.postMessage({type:'SHOW_NOTIFICATION',title,body,tag});
-    else new Notification(title,{body});
-  }catch(e){ new Notification(title,{body}); }
-}
-async function checkReminders(){
-  if(!('Notification' in window)||Notification.permission!=='granted') return;
-  const docs=await dbGetAll('documents');
-  for(const d of docs){
-    const days=daysUntil(d.expiryDate); if(days===null) continue;
-    const reminders=d.reminders||[]; const notified=d.notifiedThresholds||[];
-    for(const t of reminders){
-      if(days<=t&&!notified.includes(t)){ await notify('Document expiring',`${d.name} expires ${fmtDate(d.expiryDate)} (${daysLabel(days)}).`,`doc-${d.id}-${t}`); notified.push(t); }
+  PM.daysUntil = (value) => {
+    if (!value) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const target = new Date(`${String(value).slice(0,10)}T00:00:00`);
+    return Math.round((target - today) / 86400000);
+  };
+
+  PM.statusClass = (days) => {
+    if (days == null) return "green";
+    if (days < 0 || days <= 7) return "red";
+    if (days <= 30) return "amber";
+    return "green";
+  };
+
+  PM.statusLabel = (days) => {
+    if (days == null) return "—";
+    if (days < 0) return `${Math.abs(days)}d overdue`;
+    if (days === 0) return "Today";
+    if (days === 1) return "Tomorrow";
+    return `in ${days}d`;
+  };
+
+  PM.uuid = () => {
+    try { return crypto.randomUUID(); }
+    catch (_) { return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`; }
+  };
+
+  PM.getUser = async () => {
+    if (!PM.client) throw new Error("Supabase client is not available.");
+    const { data, error } = await PM.client.auth.getUser();
+    if (error) throw error;
+    if (!data.user) throw new Error("Authentication session missing.");
+    return data.user;
+  };
+
+  PM.requireAuth = async () => {
+    if (!PM.client) {
+      throw new Error("Supabase client is not initialized.");
     }
-    if(days<0&&!notified.includes('overdue')){await notify('Document expired',`${d.name} expired ${fmtDate(d.expiryDate)}.`,`doc-${d.id}-overdue`);notified.push('overdue');}
-    if(notified.length!==(d.notifiedThresholds||[]).length){d.notifiedThresholds=notified;await dbPut('documents',d);}
-  }
-  const items=await dbGetAll('maintenance');
-  for(const m of items){
-    const days=daysUntil(m.nextServiceDate); if(days===null) continue;
-    const reminders=m.reminders||[]; const notified=m.notifiedThresholds||[];
-    for(const t of reminders){
-      if(days<=t&&!notified.includes(t)){await notify('Maintenance due',`${m.itemName} Maintenance ${fmtDate(m.nextServiceDate)} (${daysLabel(days)}).`,`maint-${m.id}-${t}`);notified.push(t);}
+    const { data, error } = await PM.client.auth.getSession();
+    if (error) throw error;
+    if (!data.session?.user) {
+      location.href = "login.html";
+      throw new Error("Authentication session missing.");
     }
-    if(days<0&&!notified.includes('overdue')){await notify('Maintenance overdue',`${m.itemName} service was due ${fmtDate(m.nextServiceDate)}.`,`maint-${m.id}-overdue`);notified.push('overdue');}
-    if(notified.length!==(m.notifiedThresholds||[]).length){m.notifiedThresholds=notified;await dbPut('maintenance',m);}
+    PM.user = data.session.user;
+    if (!PM.documentKey) {
+      try { await PM.restoreDocumentKey(PM.user.id); } catch (_) {}
+    }
+    return PM.user;
+  };
+
+  PM.logout = async () => {
+    const uid = PM.user?.id || null;
+    try {
+      if (PM.client) await PM.client.auth.signOut();
+    } finally {
+      PM.clearDocumentKey(uid);
+      location.href = "login.html";
+    }
+  };
+
+  PM.setupHeader = () => {
+    document.getElementById("logoutBtn")?.addEventListener("click", PM.logout);
+    document.getElementById("notifPermBtn")?.addEventListener("click", PM.requestNotifications);
+    PM.updateNotificationButton();
+  };
+
+  PM.updateNotificationButton = () => {
+    const btn = document.getElementById("notifPermBtn");
+    if (!btn || !("Notification" in window)) return;
+    btn.classList.toggle("granted", Notification.permission === "granted");
+  };
+
+  PM.requestNotifications = async () => {
+    if (!("Notification" in window)) {
+      alert("Notifications are not supported in this browser.");
+      return;
+    }
+    try {
+      const p = await Notification.requestPermission();
+      PM.updateNotificationButton();
+      if (p === "granted") {
+        alert("Notifications enabled.");
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  PM.modal = (html) => {
+    const root = document.getElementById("modalRoot");
+    if (!root) return;
+    root.innerHTML = `
+      <div class="modal-backdrop" id="pmBackdrop">
+        <div class="modal-sheet">${html}</div>
+      </div>`;
+    document.getElementById("pmBackdrop")?.addEventListener("click", (e) => {
+      if (e.target.id === "pmBackdrop") PM.closeModal();
+    });
+  };
+
+  PM.closeModal = () => {
+    const root = document.getElementById("modalRoot");
+    if (root) root.innerHTML = "";
+  };
+
+
+  /* ---------- Client-side document encryption ---------- */
+  const CRYPTO_PREFIX = "pm_doc_key_v1_";
+  const CRYPTO_SALT_PREFIX = "PersonalManager-DocumentKey-v1:";
+
+  function b64(bytes) {
+    let s = "";
+    const arr = new Uint8Array(bytes);
+    for (let i = 0; i < arr.length; i += 0x8000) {
+      s += String.fromCharCode(...arr.subarray(i, i + 0x8000));
+    }
+    return btoa(s);
   }
-}
 
-document.addEventListener('DOMContentLoaded',()=>{
-  if (location.pathname.endsWith('/login.html')) return;
-  requireAuth().then(user=>{ if(user && typeof initPage==='function') initPage(); });
-});
+  function unb64(text) {
+    const s = atob(text);
+    const out = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+    return out;
+  }
 
-async function getExpenseUserId() {
-  const client = window.supabaseClient;
-  if (!client) return null;
-  const { data } = await client.auth.getUser();
-  return data?.user?.id || null;
-}
+  PM.deriveDocumentKey = async (password, userId) => {
+    if (!password || !userId) throw new Error("Unable to unlock document encryption.");
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
-}
+    const enc = new TextEncoder();
+    const material = await crypto.subtle.importKey(
+      "raw",
+      enc.encode(password),
+      "PBKDF2",
+      false,
+      ["deriveKey"]
+    );
+
+    const salt = enc.encode(CRYPTO_SALT_PREFIX + userId);
+
+    return crypto.subtle.deriveKey(
+      {
+        name: "PBKDF2",
+        salt,
+        iterations: 310000,
+        hash: "SHA-256"
+      },
+      material,
+      { name: "AES-GCM", length: 256 },
+      true,
+      ["encrypt", "decrypt"]
+    );
+  };
+
+  PM.saveDocumentKey = async (key, userId) => {
+    const raw = await crypto.subtle.exportKey("raw", key);
+    localStorage.setItem(CRYPTO_PREFIX + userId, b64(raw));
+  };
+
+  PM.restoreDocumentKey = async (userId) => {
+    const stored = localStorage.getItem(CRYPTO_PREFIX + userId);
+    if (!stored) return false;
+
+    const key = await crypto.subtle.importKey(
+      "raw",
+      unb64(stored),
+      { name: "AES-GCM" },
+      true,
+      ["encrypt", "decrypt"]
+    );
+
+    PM.documentKey = key;
+    return true;
+  };
+
+  PM.unlockDocuments = async (password, userId) => {
+    const key = await PM.deriveDocumentKey(password, userId);
+    PM.documentKey = key;
+    await PM.saveDocumentKey(key, userId);
+    return key;
+  };
+
+  PM.clearDocumentKey = (userId) => {
+    PM.documentKey = null;
+    if (userId) localStorage.removeItem(CRYPTO_PREFIX + userId);
+  };
+
+  PM.encryptFile = async (file) => {
+    if (!PM.documentKey) throw new Error("Document encryption is locked. Please log in again.");
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const plain = await file.arrayBuffer();
+    const cipher = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv },
+      PM.documentKey,
+      plain
+    );
+
+    const magic = new TextEncoder().encode("PMENC001");
+    const packed = new Uint8Array(magic.length + iv.length + cipher.byteLength);
+    packed.set(magic, 0);
+    packed.set(iv, magic.length);
+    packed.set(new Uint8Array(cipher), magic.length + iv.length);
+
+    return new Blob([packed], { type: "application/octet-stream" });
+  };
+
+  PM.decryptBlob = async (blob, originalType = "application/pdf") => {
+    if (!PM.documentKey) throw new Error("Document encryption is locked. Please log in again.");
+
+    const packed = new Uint8Array(await blob.arrayBuffer());
+    const magic = new TextDecoder().decode(packed.slice(0, 8));
+    if (magic !== "PMENC001") throw new Error("This document is not in the expected encrypted format.");
+
+    const iv = packed.slice(8, 20);
+    const cipher = packed.slice(20);
+
+    const plain = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv },
+      PM.documentKey,
+      cipher
+    );
+
+    return new Blob([plain], { type: originalType || "application/octet-stream" });
+  };
+
+  PM.initPage = async (page) => {
+    await PM.requireAuth();
+    PM.setupHeader();
+    document.querySelectorAll(".navbtn").forEach((a) => {
+      a.classList.toggle("active", a.dataset.page === page);
+    });
+  };
+
+  window.addEventListener("load", () => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    }
+  });
+})();

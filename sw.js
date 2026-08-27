@@ -1,6 +1,53 @@
-const CACHE = 'personal-manager-multipage-v1';
-const CORE = ['./','./index.html','./document.html','./maintenance.html','./finance.html','./login.html','./css/style.css','./js/common.js','./js/ui.js','./js/dashboard.js','./js/document.js','./js/maintenance.js','./js/finance.js','./js/login.js','./js/supabase-config.js','./manifest.json','./icon-192.png','./icon-512.png'];
-self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).catch(()=>{}));self.skipWaiting();});
-self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim();});
-self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;const url=new URL(e.request.url);if(url.origin!==location.origin)return;e.respondWith(fetch(e.request).then(r=>{const copy=r.clone();caches.open(CACHE).then(c=>c.put(e.request,copy)).catch(()=>{});return r;}).catch(()=>caches.match(e.request).then(r=>r||caches.match('./index.html'))));});
-self.addEventListener('message',e=>{if(e.data?.type==='SHOW_NOTIFICATION'){const {title,body,tag}=e.data;self.registration.showNotification(title,{body,tag,icon:'./icon-192.png',badge:'./icon-192.png',vibrate:[100,50,100]});}});
+const CACHE = "pm-cache-v5";
+const APP_SHELL = [
+  "./",
+  "./index.html",
+  "./documents.html",
+  "./maintenance.html",
+  "./finance.html",
+  "./login.html",
+  "./css/style.css",
+  "./js/common.js",
+  "./js/supabase-config.js",
+  "./js/dashboard.js",
+  "./js/documents.js",
+  "./js/maintenance.js",
+  "./js/finance.js",
+  "./js/login.js",
+  "./manifest.json",
+  "./icon-192.png",
+  "./icon-512.png"
+];
+
+self.addEventListener("install", event => {
+  event.waitUntil(
+    caches.open(CACHE)
+      .then(cache => cache.addAll(APP_SHELL))
+      .catch(() => {})
+  );
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", event => {
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+    )
+  );
+  self.clients.claim();
+});
+
+self.addEventListener("fetch", event => {
+  const req = event.request;
+  if (req.method !== "GET") return;
+
+  event.respondWith(
+    fetch(req)
+      .then(response => {
+        const copy = response.clone();
+        caches.open(CACHE).then(cache => cache.put(req, copy)).catch(() => {});
+        return response;
+      })
+      .catch(() => caches.match(req).then(cached => cached || caches.match("./")))
+  );
+});

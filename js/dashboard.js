@@ -1,25 +1,66 @@
-const viewEl = document.getElementById('view');
-async function renderDashboard(){
-  const [docs,maint]=await Promise.all([dbGetAll('documents'),dbGetAll('maintenance')]);
-  const docItems=docs.map(d=>({...d,_days:daysUntil(d.expiryDate),_kind:'document'}));
-  const maintItems=maint.map(m=>({...m,_days:daysUntil(m.nextServiceDate),_kind:'maintenance'}));
-  const overdueOrSoonDocs=docItems.filter(d=>d._days!==null&&d._days<=30).sort((a,b)=>a._days-b._days);
-  const dueMaint=maintItems.filter(m=>m._days!==null&&m._days<=30).sort((a,b)=>a._days-b._days);
-  const upcoming=[...docItems,...maintItems].filter(x=>x._days!==null).sort((a,b)=>a._days-b._days).slice(0,8);
-  const overdueCount=[...docItems,...maintItems].filter(x=>x._days!==null&&x._days<0).length;
-  const soonCount=[...docItems,...maintItems].filter(x=>x._days!==null&&x._days>=0&&x._days<=7).length;
-  viewEl.innerHTML=`<div class="stats"><div class="stat-card red"><div class="stat-num">${overdueCount}</div><div class="stat-label">Overdue</div></div><div class="stat-card amber"><div class="stat-num">${soonCount}</div><div class="stat-label">Due in 7 days</div></div><div class="stat-card teal"><div class="stat-num">${docs.length+maint.length}</div><div class="stat-label">Total tracked</div></div></div>
-  <div class="section"><div class="section-head"><span class="section-title">Upcoming reminders</span><span class="section-count">${upcoming.length}</span></div>${upcoming.length?upcoming.map(cardHTML).join(''):emptyHTML('Nothing due in the next month.')}</div>
-  <div class="section"><div class="section-head"><span class="section-title">Expiring documents</span><span class="section-count">${overdueOrSoonDocs.length}</span></div>${overdueOrSoonDocs.length?overdueOrSoonDocs.map(cardHTML).join(''):emptyHTML('No documents expiring soon.')}</div>
-  <div class="section"><div class="section-head"><span class="section-title">Maintenance due</span><span class="section-count">${dueMaint.length}</span></div>${dueMaint.length?dueMaint.map(cardHTML).join(''):emptyHTML('Nothing needs servicing soon.')}</div>`;
-  bindCardClicks();
-}
-function openDetail(kind,item){
-  const days=daysUntil(kind==='document'?item.expiryDate:item.nextServiceDate), cls=statusClass(days); let photoTag='';
-  if(kind==='document'&&item.fileBlob){const url=URL.createObjectURL(item.fileBlob); photoTag=item.fileType?.startsWith('image/')?`<img class="detail-photo" src="${url}">`:`<a class="detail-row" href="${url}" target="_blank" style="color:var(--teal)">Open attached file (${escapeHTML(item.fileName||'file')})</a>`;}
-  const rows=kind==='document'?`<div class="detail-row"><span class="k">Category</span><span>${escapeHTML(item.category)}</span></div><div class="detail-row"><span class="k">Issue date</span><span>${fmtDate(item.issueDate)}</span></div><div class="detail-row"><span class="k">Expiry date</span><span>${item.expiryDate?fmtDate(item.expiryDate):'No expiry'}</span></div><div class="detail-row"><span class="k">Status</span><span class="card-chip chip-${cls}">${daysLabel(days)}</span></div><div class="detail-row"><span class="k">Reminders</span><span>${(item.reminders||[]).join(', ')||'None'} days before</span></div>${item.notes?`<div class="detail-row"><span class="k">Notes</span><span>${escapeHTML(item.notes)}</span></div>`:''}`:`<div class="detail-row"><span class="k">Type</span><span>${escapeHTML(item.type)}</span></div><div class="detail-row"><span class="k">Last service</span><span>${fmtDate(item.lastServiceDate)}</span></div><div class="detail-row"><span class="k">Next service</span><span>${fmtDate(item.nextServiceDate)}</span></div><div class="detail-row"><span class="k">Status</span><span class="card-chip chip-${cls}">${daysLabel(days)}</span></div>${item.cost?`<div class="detail-row"><span class="k">Cost</span><span>₹${item.cost}</span></div>`:''}<div class="detail-row"><span class="k">Reminders</span><span>${(item.reminders||[]).join(', ')||'None'} days before</span></div>${item.notes?`<div class="detail-row"><span class="k">Notes</span><span>${escapeHTML(item.notes)}</span></div>`:''}`;
-  openModal(`<div class="modal-title">${escapeHTML(kind==='document'?item.name:item.itemName)}</div>${rows}${photoTag}<div class="modal-actions"><button type="button" class="btn" id="closeDetailBtn">Close</button><button type="button" class="btn primary" id="editBtn">Edit</button></div>`);
-  document.getElementById('closeDetailBtn').onclick=closeModal;
-  document.getElementById('editBtn').onclick=()=>{closeModal(); if(kind==='document')openDocumentForm(item);else openMaintenanceForm(item);};
-}
-function initPage(){ renderDashboard(); }
+(() => {
+  "use strict";
+  const PM = window.PM;
+  const view = document.getElementById("view");
+
+  async function dbAll(table) {
+    const { data, error } = await PM.client.from(table).select("*").eq("user_id", PM.user.id).order("created_at", { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+
+  function docMap(d) {
+    return { ...d, _kind: "document", _days: PM.daysUntil(d.expiry_date) };
+  }
+
+  function maintMap(m) {
+    return { ...m, _kind: "maintenance", _days: PM.daysUntil(m.next_service_date) };
+  }
+
+  function card(item) {
+    const title = item._kind === "document" ? item.name : (item.item_name || item.category || "Maintenance item");
+    const sub = item._kind === "document"
+      ? `${item.category || "Document"} · ${item.expiry_date ? `expires ${PM.dateText(item.expiry_date)}` : "No expiry"}`
+      : `${item.category || "Maintenance"} · next service ${PM.dateText(item.next_service_date)}`;
+    return `<a class="card status-${PM.statusClass(item._days)}" href="${item._kind === "document" ? "documents.html" : "maintenance.html"}">
+      <div class="card-main"><div class="card-title">${PM.escape(title)}</div><div class="card-sub">${PM.escape(sub)}</div></div>
+      <div class="card-chip chip-${PM.statusClass(item._days)}">${PM.escape(PM.statusLabel(item._days))}</div>
+    </a>`;
+  }
+
+  async function render() {
+    try {
+      await PM.initPage("dashboard");
+      const [docs, maint] = await Promise.all([dbAll("documents"), dbAll("maintenance")]);
+      const items = [...docs.map(docMap), ...maint.map(maintMap)];
+      const expiring = docs.map(docMap).filter(x => x._days != null && x._days <= 30).sort((a,b)=>a._days-b._days);
+      const due = maint.map(maintMap).filter(x => x._days != null && x._days <= 30).sort((a,b)=>a._days-b._days);
+      const upcoming = items.filter(x => x._days != null && x._days >= 0 && x._days <= 30).sort((a,b)=>a._days-b._days).slice(0,8);
+      const overdue = items.filter(x => x._days != null && x._days < 0).length;
+      const soon = items.filter(x => x._days != null && x._days >= 0 && x._days <= 7).length;
+
+      view.innerHTML = `
+        <h1 class="page-title">Dashboard</h1>
+        <p class="page-subtitle">Your personal reminders and records</p>
+        <div class="stats">
+          <div class="stat-card"><div class="stat-num">${overdue}</div><div class="stat-label">Overdue</div></div>
+          <div class="stat-card"><div class="stat-num">${soon}</div><div class="stat-label">Due in 7 days</div></div>
+          <div class="stat-card"><div class="stat-num">${items.length}</div><div class="stat-label">Total tracked</div></div>
+        </div>
+        <div class="section"><div class="section-head"><span class="section-title">Upcoming reminders</span><span class="section-count">${upcoming.length}</span></div>
+          ${upcoming.length ? upcoming.map(card).join("") : '<div class="empty">Nothing due in the next month.</div>'}
+        </div>
+        <div class="section"><div class="section-head"><span class="section-title">Expiring documents</span><span class="section-count">${expiring.length}</span></div>
+          ${expiring.length ? expiring.map(card).join("") : '<div class="empty">No documents expiring soon.</div>'}
+        </div>
+        <div class="section"><div class="section-head"><span class="section-title">Maintenance due</span><span class="section-count">${due.length}</span></div>
+          ${due.length ? due.map(card).join("") : '<div class="empty">Nothing needs servicing soon.</div>'}
+        </div>`;
+    } catch (e) {
+      console.error(e);
+      view.innerHTML = `<div class="error">${PM.escape(e.message || String(e))}</div>`;
+    }
+  }
+
+  render();
+})();

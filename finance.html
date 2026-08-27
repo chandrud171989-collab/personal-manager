@@ -1,1 +1,34 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#12151a"><title>Finance - Personal Manager</title><link rel="manifest" href="manifest.json"><link rel="icon" href="icon-192.png"><link rel="stylesheet" href="css/style.css"></head><body><div id="app"><header class="topbar"><div class="topbar-brand"><span class="brand-mark"></span><span class="brand-name">Personal Manager</span></div><div class="topbar-actions"><button id="notifPermBtn" class="icon-btn">🔔</button><button id="logoutBtn" class="logout-btn" type="button">↪ <span>Logout</span></button></div></header><main id="view" class="view"></main><nav class="bottomnav"><a class="navbtn" href="index.html">▦<span>Dashboard</span></a><a class="navbtn" href="documents.html">▤<span>Documents</span></a><a class="navbtn" href="maintenance.html">🔧<span>Maintenance</span></a><a class="navbtn active" href="finance.html">●<span>Finance</span></a></nav></div><div id="modalRoot"></div><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="js/supabase-config.js"></script><script src="js/common.js"></script><script src="js/ui.js"></script><script src="js/finance.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#12151a">
+<title>Finance - Personal Manager</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="css/style.css">
+
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-brand"><span class="brand-mark"></span><span>Personal Manager</span></div>
+  <div class="topbar-actions">
+    <button id="notifPermBtn" class="icon-btn" type="button" title="Notifications">🔔</button>
+    <button id="logoutBtn" class="logout-btn" type="button">↪ <span>Logout</span></button>
+  </div>
+</header>
+<main id="view" class="view"><div class="empty">Loading finance...</div></main>
+<nav class="bottomnav">
+  <a class="navbtn " data-page="dashboard" href="index.html">▦<span>Dashboard</span></a>
+  <a class="navbtn " data-page="documents" href="documents.html">▤<span>Documents</span></a>
+  <a class="navbtn " data-page="maintenance" href="maintenance.html">🔧<span>Maintenance</span></a>
+  <a class="navbtn active" data-page="finance" href="finance.html">₹<span>Finance</span></a>
+</nav>
+<div id="modalRoot"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/common.js"></script>
+<script src="js/finance.js"></script>
+</body>
+</html>
