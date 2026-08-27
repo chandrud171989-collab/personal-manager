@@ -210,13 +210,7 @@ function form(old=null){
         // Existing reminder column
         reminders: reminder === null ? [] : [reminder],
 
-        // Keep notification history
-        notified_thresholds:
-            edit && old?.expiry_date === expiry
-            ? (old?.notified_thresholds || [])
-            : [],
-
-        // New Supabase Storage metadata
+                // New Supabase Storage metadata
         file_path: path || (old?.file_path || null),
         file_name: file ? file.name : (old?.file_name || null),
         file_type: file ? file.type : (old?.file_type || null),
