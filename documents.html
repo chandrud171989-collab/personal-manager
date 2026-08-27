@@ -7,41 +7,94 @@
 <title>Documents - Personal Manager</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
-<!-- IMPORTANT: use the same root stylesheet as the existing app -->
-<link rel="stylesheet" href="style.css">
+<style>
+:root{--bg:#12151a;--surface:#1c222a;--surface2:#242b35;--border:#2b3440;--text:#eef2f7;--dim:#8b9bb5;--teal:#2dd4bf;--red:#ff5265;--radius:16px}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:Inter,Arial,sans-serif}body{padding-bottom:88px}.topbar{height:76px;padding:12px 32px;display:flex;align-items:center;justify-content:space-between;background:var(--bg)}.topbar-brand{display:flex;align-items:center;gap:12px;font-size:25px;font-weight:800}.brand-mark{width:20px;height:20px;border-radius:6px;background:var(--teal);box-shadow:0 0 0 5px rgba(45,212,191,.12)}.topbar-actions{display:flex;gap:10px}.icon-btn,.logout-btn{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:14px;min-height:48px;padding:0 16px;font-weight:700}.icon-btn{width:58px;font-size:20px}.view{max-width:1000px;margin:0 auto;padding:20px 32px}.section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin:16px 0}.section-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.section-title{font-size:18px;font-weight:700}.section-count{color:var(--dim)}.empty{padding:28px;text-align:center;color:var(--dim)}.card{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px;border:1px solid var(--border);border-left:4px solid var(--teal);border-radius:16px;background:var(--surface2);margin:10px 0;cursor:pointer}.card-title{font-size:19px;font-weight:800}.card-sub{margin-top:6px;color:var(--dim)}.card-chip{padding:8px 12px;border-radius:999px;background:rgba(45,212,191,.12);color:var(--teal);font-weight:700}.fab{position:fixed;right:28px;bottom:98px;width:78px;height:78px;border:0;border-radius:50%;background:var(--teal);color:#071310;font-size:42px;box-shadow:0 12px 30px rgba(45,212,191,.25);z-index:50;cursor:pointer}.bottomnav{position:fixed;left:0;right:0;bottom:0;height:80px;background:#1a2028;border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(4,1fr);z-index:40}.navbtn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:var(--dim);font-weight:700;text-decoration:none}.navbtn.active{color:var(--teal)}.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;padding:16px;z-index:100}.modal{width:min(720px,100%);max-height:92vh;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:22px}.modal-title{font-size:24px;font-weight:800;margin-bottom:18px}.field{margin:15px 0}.field label{display:block;color:var(--dim);font-weight:700;font-size:14px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px}.field input,.field select,.field textarea{width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:14px;padding:14px 16px;font:inherit;outline:none}.field textarea{min-height:100px;resize:vertical}.field small{color:var(--dim);display:block;margin-top:7px}.chip-row{display:flex;gap:10px;flex-wrap:wrap}.chip-toggle{border:1px solid var(--teal);background:transparent;color:var(--teal);border-radius:999px;padding:10px 17px;font-weight:700;cursor:pointer}.chip-toggle.on{background:rgba(45,212,191,.16)}.chip-toggle:disabled{opacity:.35}.filepick{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.filepick-name{flex:1;color:var(--dim);overflow:hidden;text-overflow:ellipsis}.filepick-btn{border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}.filepick input{display:none}.modal-actions{display:flex;gap:12px;margin-top:20px}.btn{flex:1;border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:14px 18px;border-radius:14px;font-weight:800;font-size:16px;cursor:pointer}.btn.primary{background:var(--teal);color:#071310;border-color:var(--teal)}.btn.danger{color:var(--red);background:rgba(255,82,101,.12)}.btn:disabled{opacity:.5;cursor:not-allowed}.detail-row{display:flex;justify-content:space-between;gap:20px;padding:12px 0;border-bottom:1px solid var(--border)}.status{font-size:13px;color:var(--dim);margin-top:10px}.error{color:#fca5a5;background:rgba(255,82,101,.1);border-radius:12px;padding:14px;margin:12px 0}.hidden{display:none!important}@media(max-width:700px){.topbar{padding:10px 16px}.topbar-brand{font-size:20px}.view{padding:14px}.fab{right:18px;bottom:94px;width:72px;height:72px}.modal-actions{flex-direction:column}.card{align-items:flex-start}.card-chip{margin-left:auto}.detail-row{flex-direction:column;gap:5px}}
+</style>
 </head>
 <body>
-<div id="app">
-  <header class="topbar">
-    <div class="topbar-brand">
-      <span class="brand-mark"></span>
-      <span class="brand-name">Personal Manager</span>
-    </div>
-    <div class="topbar-actions">
-      <button id="notifPermBtn" class="icon-btn" type="button" title="Enable notifications" aria-label="Enable notifications">🔔</button>
-      <button id="logoutBtn" class="logout-btn" type="button" title="Logout"><span class="logout-icon">↪</span><span>Logout</span></button>
-    </div>
-  </header>
-
-  <main id="view" class="view"></main>
-
-  <button id="fab" class="fab" type="button" aria-label="Add new">
-    <span aria-hidden="true">+</span>
-  </button>
-
-  <nav class="bottomnav">
-    <a class="navbtn" href="index.html">▦<span>Dashboard</span></a>
-    <a class="navbtn active" href="documents.html">▤<span>Documents</span></a>
-    <a class="navbtn" href="maintenance.html">🔧<span>Maintenance</span></a>
-    <a class="navbtn" href="finance.html">●<span>Finance</span></a>
-  </nav>
-</div>
-
+<header class="topbar">
+  <div class="topbar-brand"><span class="brand-mark"></span><span>Personal Manager</span></div>
+  <div class="topbar-actions"><button id="notifPermBtn" class="icon-btn" type="button">🔔</button><button id="logoutBtn" class="logout-btn" type="button">↪ Logout</button></div>
+</header>
+<main id="view" class="view"><div class="empty">Loading documents...</div></main>
+<button id="fab" class="fab" type="button" aria-label="Add document">+</button>
+<nav class="bottomnav">
+  <a class="navbtn" href="index.html">▦<span>Dashboard</span></a>
+  <a class="navbtn active" href="documents.html">▤<span>Documents</span></a>
+  <a class="navbtn" href="maintenance.html">🔧<span>Maintenance</span></a>
+  <a class="navbtn" href="finance.html">●<span>Finance</span></a>
+</nav>
 <div id="modalRoot"></div>
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=20260827"></script>
-<script src="documents.js?v=20260827-v3"></script>
+<script src="supabase-config.js?v=20260827-cloud1"></script>
+<script>
+(() => {
+'use strict';
+const BUCKET='documents', MAX=6*1024*1024;
+const CATS=['Aadhaar','PAN','ID / Driving License','Passport','Voter ID','Warranty','Vehicle RC','Subscription','Property','Education Certificate','Other'];
+const $=id=>document.getElementById(id);
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function client(){
+  if(window.supabaseClient?.auth) return window.supabaseClient;
+  if(window.supabase?.auth && window.supabase?.from) return window.supabase;
+  throw new Error('Supabase client is not loaded. Check supabase-config.js.');
+}
+async function user(){const {data,error}=await client().auth.getUser();if(error)throw error;if(!data.user){location.href='login.html';throw new Error('Not logged in.');}return data.user;}
+function fmt(d){if(!d)return '—';const x=new Date(d+'T00:00:00');return Number.isNaN(x.getTime())?d:x.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});}
+function uid(){try{return crypto.randomUUID()}catch{return Date.now().toString(36)+Math.random().toString(36).slice(2)}}
+function modal(html){$('modalRoot').innerHTML='<div class="modal-backdrop" id="docBackdrop"><div class="modal">'+html+'</div></div>';$('docBackdrop').addEventListener('click',e=>{if(e.target.id==='docBackdrop')closeModal()});}
+function closeModal(){$('modalRoot').innerHTML='';}
+async function load(){
+  const u=await user();
+  const {data,error}=await client().from('documents').select('*').eq('user_id',u.id).order('created_at',{ascending:false});
+  if(error)throw error;
+  return data||[];
+}
+async function upload(file,u,id){
+  if(!file)return null;
+  if(file.size>MAX)throw new Error('Maximum file size is 6 MB.');
+  if(!['application/pdf','image/jpeg','image/png'].includes(file.type))throw new Error('Only PDF, JPG or PNG files are allowed.');
+  const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+  const path=u+'/'+id+'/'+Date.now()+'-'+safe;
+  const {error}=await client().storage.from(BUCKET).upload(path,file,{cacheControl:'3600',contentType:file.type,upsert:false});
+  if(error)throw new Error('File upload failed: '+error.message);
+  return path;
+}
+async function removeFile(path){if(!path)return;const {error}=await client().storage.from(BUCKET).remove([path]);if(error)console.warn('Storage delete:',error.message);}
+async function viewFile(path){const {data,error}=await client().storage.from(BUCKET).createSignedUrl(path,600);if(error||!data?.signedUrl)throw new Error(error?.message||'Could not create secure file URL.');window.open(data.signedUrl,'_blank','noopener,noreferrer');}
+async function render(){
+  const view=$('view');view.innerHTML='<div class="empty">Loading documents...</div>';
+  try{const rows=await load();view.innerHTML='<div class="section"><div class="section-head"><span class="section-title">All documents</span><span class="section-count">'+rows.length+'</span></div>'+(rows.length?rows.map(d=>'<div class="card" data-id="'+esc(d.id)+'"><div><div class="card-title">'+esc(d.name)+'</div><div class="card-sub">'+esc(d.category||'Other')+' · '+(d.expiry_date?'expires '+esc(fmt(d.expiry_date)):'No expiry')+(d.file_name?' · '+esc(d.file_name):'')+'</div></div><div class="card-chip">'+(d.file_path?'File':'No file')+'</div></div>').join(''):'<div class="empty">No documents yet. Tap + to add one.</div>')+'</div>';
+  view.querySelectorAll('.card[data-id]').forEach(c=>c.onclick=async()=>{const d=rows.find(x=>x.id===c.dataset.id);if(d)detail(d)});
+  }catch(e){console.error(e);view.innerHTML='<div class="error">Unable to load documents.<br>'+esc(e.message||e)+'</div>';}
+}
+function detail(d){modal('<div class="modal-title">'+esc(d.name)+'</div><div class="section"><div class="detail-row"><span>Category</span><strong>'+esc(d.category||'Other')+'</strong></div><div class="detail-row"><span>Issue date</span><strong>'+esc(d.issue_date?fmt(d.issue_date):'—')+'</strong></div><div class="detail-row"><span>Expiry</span><strong>'+esc(d.expiry_date?fmt(d.expiry_date):'No expiry')+'</strong></div><div class="detail-row"><span>File</span><strong>'+esc(d.file_name||'No file attached')+'</strong></div>'+(d.notes?'<div class="detail-row"><span>Notes</span><span>'+esc(d.notes)+'</span></div>':'')+'</div><div class="modal-actions">'+(d.file_path?'<button class="btn primary" id="viewFile">View File</button>':'')+'<button class="btn" id="editDoc">Edit</button><button class="btn" id="closeDoc">Close</button></div>');
+  $('closeDoc').onclick=closeModal;$('editDoc').onclick=()=>{closeModal();form(d)};$('viewFile')?.addEventListener('click',async()=>{try{await viewFile(d.file_path)}catch(e){alert(e.message)}});
+}
+function form(old=null){
+  const edit=!!old, id=old?.id||uid(), rem=Array.isArray(old?.reminders)?old.reminders[0]:null, noExp=!old?.expiry_date;
+  modal('<div class="modal-title">'+(edit?'Edit document':'Add document')+'</div><form id="docForm"><div class="field"><label>Document name</label><input name="name" required value="'+esc(old?.name||'')+'" placeholder="e.g. Car insurance"></div><div class="field"><label>Category</label><select name="category">'+CATS.map(c=>'<option '+(old?.category===c?'selected':'')+'>'+esc(c)+'</option>').join('')+'</select></div><div class="field"><label>Issue date</label><input type="date" name="issueDate" value="'+esc(old?.issue_date||'')+'"></div><div class="field"><label>Expiry date</label><input id="expiry" type="date" name="expiryDate" value="'+esc(old?.expiry_date||'')+'" '+(noExp?'disabled':'')+'></div><div class="field"><label style="text-transform:none"><input id="noExpiry" type="checkbox" '+(noExp?'checked':'')+'> No expiry</label></div><div class="field"><label>Remind me before expiry</label><div class="chip-row" id="chips">'+[30,7,1].map(n=>'<button type="button" class="chip-toggle '+(rem===n?'on':'')+'" data-n="'+n+'">'+n+' day'+(n>1?'s':'')+'</button>').join('')+'<button type="button" class="chip-toggle" id="customBtn">Custom</button></div><div id="customWrap" style="display:none;margin-top:12px"><label style="text-transform:none">Custom reminder (days)</label><input id="customDays" type="number" min="1" max="365"></div></div><div class="field"><label>Notes</label><textarea name="notes" placeholder="Optional notes">'+esc(old?.notes||'')+'</textarea></div><div class="field"><label>Photo / PDF</label><div class="filepick"><span id="fileName" class="filepick-name">'+esc(old?.file_name||'No file attached')+'</span><button type="button" id="chooseFile" class="filepick-btn">Choose File</button><input id="fileInput" type="file" accept="application/pdf,image/jpeg,image/png"></div><small>PDF, JPG or PNG. Maximum 6 MB. Stored securely in Supabase Storage.</small></div><div id="formStatus" class="status"></div><div class="modal-actions">'+(edit?'<button type="button" class="btn danger" id="deleteDoc">Delete Entry</button>':'')+'<button type="button" class="btn" id="cancel">Cancel</button><button type="submit" class="btn primary" id="save">Save</button></div></form>');
+  let file=null, selected=rem;
+  const chips=[...document.querySelectorAll('#chips .chip-toggle[data-n]')], custom=$('customBtn'), wrap=$('customWrap'), days=$('customDays'), no=$('noExpiry'), exp=$('expiry');
+  function clear(){selected=null;chips.forEach(x=>x.classList.remove('on'));custom.classList.remove('on');wrap.style.display='none';days.value='';}
+  chips.forEach(x=>x.onclick=()=>{if(no.checked)return;clear();selected=Number(x.dataset.n);x.classList.add('on')});
+  custom.onclick=()=>{if(no.checked)return;if(custom.classList.contains('on'))clear();else{clear();custom.classList.add('on');wrap.style.display='block';days.focus()}};
+  function expiryState(){exp.disabled=no.checked;chips.forEach(x=>x.disabled=no.checked);custom.disabled=no.checked;if(no.checked)clear();}
+  no.onchange=expiryState;expiryState();
+  if(rem && ![30,7,1].includes(rem)){custom.classList.add('on');wrap.style.display='block';days.value=rem}
+  $('chooseFile').onclick=()=>$('fileInput').click();$('fileInput').onchange=e=>{const f=e.target.files[0];if(!f)return;file=f;$('fileName').textContent=f.name};$('cancel').onclick=closeModal;
+  if(edit)$('deleteDoc').onclick=async()=>{if(!confirm('Delete this document entry?'))return;try{const u=await user();const {error}=await client().from('documents').delete().eq('id',old.id).eq('user_id',u.id);if(error)throw error;await removeFile(old.file_path);closeModal();render()}catch(e){alert('Could not delete document: '+e.message)}};
+  $('docForm').onsubmit=async e=>{e.preventDefault();const btn=$('save');btn.disabled=true;btn.textContent='Saving...';try{const fd=new FormData(e.target),u=await user();const name=String(fd.get('name')||'').trim(),issue=String(fd.get('issueDate')||'')||null,expiry=no.checked?null:(String(fd.get('expiryDate')||'')||null);if(!name)throw new Error('Please enter a document name.');if(issue&&expiry&&issue>expiry)throw new Error('Expiry date must be after the issue date.');let reminder=null;if(!no.checked){if(custom.classList.contains('on')){reminder=Number(days.value);if(!Number.isInteger(reminder)||reminder<1||reminder>365)throw new Error('Custom reminder must be between 1 and 365 days.')}else if(selected)reminder=selected}
+    let path=old?.file_path||null;if(file){path=await upload(file,u.id,id)}
+    const record={id,user_id:u.id,name,category:String(fd.get('category')||'Other'),issue_date:issue,expiry_date:expiry,notes:String(fd.get('notes')||'').trim()||null,file_path:path,file_name:file?file.name:(old?.file_name||null),file_type:file?file.type:(old?.file_type||null),file_size:file?file.size:(old?.file_size||null),reminders:reminder?[reminder]:[],notified_thresholds:edit&&old?.expiry_date===expiry?(old?.notified_thresholds||[]):[],updated_at:new Date().toISOString()};if(!edit)record.created_at=new Date().toISOString();const {error}=await client().from('documents').upsert(record,{onConflict:'id'});if(error){if(file&&path&&!old?.file_path)await removeFile(path);throw error}if(file&&old?.file_path&&old.file_path!==path)await removeFile(old.file_path);closeModal();await render();
+  }catch(err){console.error(err);$('formStatus').textContent=err.message||String(err);btn.disabled=false;btn.textContent='Save'}};
+}
+$('fab').onclick=()=>form(null);
+$('logoutBtn').onclick=async()=>{try{await client().auth.signOut()}finally{location.href='login.html'}};
+$('notifPermBtn').onclick=async()=>{if(!('Notification'in window))return alert('Notifications are not supported by this browser.');const p=await Notification.requestPermission();if(p==='granted')alert('Notifications enabled.')};
+(async()=>{try{await user();await render()}catch(e){console.error(e);$('view').innerHTML='<div class="error">Unable to start Documents.<br>'+esc(e.message||e)+'</div>'}})();
+})();
+</script>
 </body>
 </html>
