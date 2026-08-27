@@ -2,13 +2,14 @@
   "use strict";
   const PM = window.PM;
   const ITEMS = ["AC","RO / Water Purifier","Refrigerator","Washing Machine","Geyser","Vehicle Service","Home Cleaning","Pest Control","Electrical/Plumbing","Other"];
+  const TYPES = ["Appliance","Vehicle","Service"];
   const REM = [30,7,1];
   const view = document.getElementById("view");
 
   async function load() {
     const { data, error } = await PM.client
       .from("maintenance")
-      .select("id,user_id,item_name,last_service_date,next_service_date,cost,notes,reminders,created_at,updated_at")
+      .select("id,user_id,type,item_name,last_service_date,next_service_date,cost,notes,reminders,created_at,updated_at")
       .eq("user_id", PM.user.id)
       .order("created_at",{ascending:false});
     if (error) throw error;
@@ -69,7 +70,7 @@
           return `<div class="card status-${PM.statusClass(days)}" data-id="${PM.escape(m.id)}">
             <div class="card-main">
               <div class="card-title">${PM.escape(m.item_name || "Other item")}</div>
-              <div class="card-sub">Next service ${PM.escape(PM.dateText(m.next_service_date))}${m.cost != null ? ` · ₹${PM.money(m.cost)}` : ""}</div>
+              <div class="card-sub">${PM.escape(m.type || "")}${m.type ? " · " : ""}Next service ${PM.escape(PM.dateText(m.next_service_date))}${m.cost != null ? ` · ₹${PM.money(m.cost)}` : ""}</div>
             </div>
             <div class="card-chip chip-${PM.statusClass(days)}">${PM.escape(PM.statusLabel(days))}</div>
           </div>`;
@@ -101,6 +102,7 @@
     const reminder = selectedReminder(m);
     PM.modal(`
       <div class="modal-title">${PM.escape(m.item_name || "Maintenance item")}</div>
+      <div class="detail-row"><span>Type</span><strong>${PM.escape(m.type || "—")}</strong></div>
       <div class="detail-row"><span>Last serviced</span><strong>${PM.escape(PM.dateText(m.last_service_date))}</strong></div>
       <div class="detail-row"><span>Service due</span><strong>${PM.escape(PM.dateText(m.next_service_date))}</strong></div>
       ${m.cost != null ? `<div class="detail-row"><span>Cost</span><strong>₹${PM.money(m.cost)}</strong></div>` : ""}
@@ -123,6 +125,12 @@
     PM.modal(`
       <div class="modal-title">${edit ? "Edit home item" : "Add home item"}</div>
       <form id="maintForm">
+        <div class="field">
+          <label>Type</label>
+          <select id="typeSelect" name="type">
+            ${TYPES.map(t=>`<option value="${PM.escape(t)}" ${(old?.type===t) || (!old && t==="Appliance") ? "selected":""}>${PM.escape(t)}</option>`).join("")}
+          </select>
+        </div>
         <div class="field">
           <label>Item</label>
           <select id="itemSelect" name="item">
@@ -183,6 +191,7 @@
       btn.disabled=true;btn.textContent="Saving...";
       try{
         const fd=new FormData(e.target);
+        const type=String(fd.get("type")||"Appliance");
         const selected=String(fd.get("item")||"Other");
         const custom=String(fd.get("customItem")||"").trim();
         const itemName=selected==="Other"?(custom||"Other item"):selected;
@@ -205,6 +214,7 @@
 
         const record={
           id,user_id:PM.user.id,
+          type,
           item_name:itemName,
           last_service_date:last,
           next_service_date:next,
