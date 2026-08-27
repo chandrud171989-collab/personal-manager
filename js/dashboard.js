@@ -4,13 +4,7 @@
   const view = document.getElementById("view");
 
   async function dbAll(table) {
-    const columns = table === "documents"
-      ? "id,name,category,issue_date,expiry_date,created_at"
-      : "id,item_name,category,next_service_date,created_at";
-    const { data, error } = await PM.client.from(table)
-      .select(columns)
-      .eq("user_id", PM.user.id)
-      .order("created_at", { ascending: false });
+    const { data, error } = await PM.client.from(table).select("*").eq("user_id", PM.user.id).order("created_at", { ascending: false });
     if (error) throw error;
     return data || [];
   }
@@ -27,7 +21,7 @@
     const title = item._kind === "document" ? item.name : (item.item_name || item.category || "Maintenance item");
     const sub = item._kind === "document"
       ? `${item.category || "Document"} · ${item.expiry_date ? `expires ${PM.dateText(item.expiry_date)}` : "No expiry"}`
-      : `${item.category || "Maintenance"} · next service ${PM.dateText(item.next_service_date)}`;
+      : `Maintenance · next service ${PM.dateText(item.next_service_date)}`;
     return `<a class="card status-${PM.statusClass(item._days)}" href="${item._kind === "document" ? "documents.html" : "maintenance.html"}">
       <div class="card-main"><div class="card-title">${PM.escape(title)}</div><div class="card-sub">${PM.escape(sub)}</div></div>
       <div class="card-chip chip-${PM.statusClass(item._days)}">${PM.escape(PM.statusLabel(item._days))}</div>

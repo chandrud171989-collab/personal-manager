@@ -60,13 +60,13 @@
           if (error) throw error;
           if (data.session) {
             await PM.unlockDocuments(password, data.user.id);
-            location.href = "index.html";
+            await PM.unlockDocuments(password, data.user.id);
+          location.href = "index.html";
           }
           else render("login", "Account created. Please verify your email, then log in.");
         } else {
-          const { data, error } = await client.auth.signInWithPassword({ email, password });
+          const { error } = await client.auth.signInWithPassword({ email, password });
           if (error) throw error;
-          await PM.unlockDocuments(password, data.user.id);
           location.href = "index.html";
         }
       } catch (e) {
