@@ -231,4 +231,12 @@ function openDocumentForm(existing) {
 
 
 function render(){ return renderDocuments(); }
-async function initPage(){ await renderDocuments(); const id=sessionStorage.getItem('pm_edit_id'); const kind=sessionStorage.getItem('pm_edit_kind'); if(id&&kind==='document'){sessionStorage.removeItem('pm_edit_id');sessionStorage.removeItem('pm_edit_kind');const item=(await dbGetAll('documents')).find(x=>x.id===id);if(item)openDocumentForm(item);}}
+async function initPage(){
+  await renderDocuments();
+  const fab = document.getElementById('fab');
+  if (fab && !fab.dataset.bound) {
+    fab.dataset.bound = '1';
+    fab.addEventListener('click', () => openDocumentForm(null));
+  }
+  const id=sessionStorage.getItem('pm_edit_id'); const kind=sessionStorage.getItem('pm_edit_kind'); if(id&&kind==='document'){sessionStorage.removeItem('pm_edit_id');sessionStorage.removeItem('pm_edit_kind');const item=(await dbGetAll('documents')).find(x=>x.id===id);if(item)openDocumentForm(item);}
+}
