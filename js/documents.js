@@ -25,8 +25,10 @@
     }
 
     const encrypted = await PM.encryptFile(file);
-    const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const path = `${userId}/${docId}/${Date.now()}-${safe}.enc`;
+    // Use an opaque token rather than the original filename/extension, so the
+    // storage path itself doesn't leak what the document is or its file type.
+    const token = PM.uuid();
+    const path = `${userId}/${docId}/${Date.now()}-${token}.enc`;
 
     const { error } = await PM.client.storage.from(BUCKET).upload(path, encrypted, {
       cacheControl: "3600",
@@ -41,7 +43,30 @@
   async function removeFile(path) {
     if (!path) return;
     const { error } = await PM.client.storage.from(BUCKET).remove([path]);
-    if (error) console.warn("Storage delete:", error.message);
+    if (error) console.warn(`Storage delete failed for ${path}:`, error.message);
+  }
+
+  // Revoke the blob URL once the viewer tab is actually closed, rather than
+  // on a blind timer that could cut off a large file still loading/being read.
+  // A safety-net timeout still applies in case the tab is left open indefinitely
+  // or the popup was blocked and we can't observe its lifecycle.
+  function scheduleBlobRevoke(url, popup) {
+    const SAFETY_NET_MS = 30 * 60 * 1000; // 30 minutes
+    let revoked = false;
+    const revoke = () => {
+      if (revoked) return;
+      revoked = true;
+      clearInterval(poll);
+      clearTimeout(safetyNet);
+      URL.revokeObjectURL(url);
+    };
+    let poll = null;
+    if (popup) {
+      poll = setInterval(() => {
+        if (popup.closed) revoke();
+      }, 1000);
+    }
+    const safetyNet = setTimeout(revoke, SAFETY_NET_MS);
   }
 
   async function viewFile(doc) {
@@ -58,11 +83,10 @@
 
       if (popup) {
         popup.location.href = url;
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
       } else {
         window.location.href = url;
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
       }
+      scheduleBlobRevoke(url, popup);
     } catch (e) {
       if (popup) popup.close();
       throw new Error(`Could not open encrypted file: ${e.message || e}`);
