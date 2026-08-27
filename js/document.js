@@ -12,31 +12,6 @@ async function renderDocuments() {
   bindCardClicks();
 }
 
-async function renderMaintenance(generation) {
-  const items = (await dbGetAll('maintenance')).map(m => ({...m, _days: daysUntil(m.nextServiceDate)}))
-    .sort((a,b) => (a._days ?? 9999) - (b._days ?? 9999));
-
-  if (!renderIsCurrent(generation, 'maintenance')) return;
-
-  viewEl.innerHTML = `
-    <div class="section" style="margin-top:8px;">
-      <div class="section-head"><span class="section-title">Home items</span><span class="section-count">${items.length}</span></div>
-      ${items.length ? items.map(m => cardHTML({...m, _kind:'maintenance'})).join('') : emptyHTML('No items yet. Tap + to add one.')}
-    </div>
-
-    ${maintenanceExpenseSummaryHTML()}
-  `;
-
-  bindCardClicks();
-  document.getElementById('viewExpenseBtn')?.addEventListener('click', renderMaintenanceExpenseSummary);
-  document.getElementById('expenseFromDate')?.addEventListener('change', renderMaintenanceExpenseSummary);
-  document.getElementById('expenseToDate')?.addEventListener('change', renderMaintenanceExpenseSummary);
-
-  // Show the summary immediately using the existing maintenance costs.
-  if (renderIsCurrent(generation, 'maintenance')) {
-    await renderMaintenanceExpenseSummary();
-  }
-}
 function openDocumentForm(existing) {
   const isEdit = !!existing;
   const old = existing || { id: uid(), reminders: [], notifiedThresholds: [] };
