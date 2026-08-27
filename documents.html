@@ -200,17 +200,14 @@ function form(old=null){
         id,
         user_id: u.id,
 
-        // Existing document columns
-        name: name,
         category: String(fd.get('category') || 'Other'),
+        name: name,
         issue_date: issue || null,
         expiry_date: expiry || null,
         notes: String(fd.get('notes') || '').trim() || null,
 
-        // Existing reminder column
-        reminders: reminder === null ? [] : [reminder],
+        reminder_days: reminder,
 
-                // New Supabase Storage metadata
         file_path: path || (old?.file_path || null),
         file_name: file ? file.name : (old?.file_name || null),
         file_type: file ? file.type : (old?.file_type || null),
@@ -222,14 +219,19 @@ function form(old=null){
         if (!edit) {
         record.created_at = new Date().toISOString();
         }
-            if(!edit)record.created_at=new Date().toISOString();
 
-      const {error}=await client().from('documents').upsert(record,{onConflict:'id'});
-      if(error)throw error;
+        const { error } = await client()
+        .from('documents')
+        .upsert(record, { onConflict: 'id' });
 
-      if(file&&old?.file_path&&old.file_path!==path)await removeFile(old.file_path);
-      closeModal();
-      await render();
+        if (error) throw error;
+
+        if (file && old?.file_path && old.file_path !== path) {
+        await removeFile(old.file_path);
+        }
+
+        closeModal();
+        await render();
     }catch(err){
       console.error('Document save error:',err);
       if(uploadedPath)await removeFile(uploadedPath);
