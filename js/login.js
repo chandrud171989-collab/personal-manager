@@ -41,7 +41,7 @@
       try {
         if (reset) {
           const { error } = await client.auth.resetPasswordForEmail(email, {
-            redirectTo: `${location.origin}${location.pathname}`
+            redirectTo: "https://chandrud171989-collab.github.io/personal-manager/reset-password.html"
           });
           if (error) throw error;
           render("login", "Password reset email sent. Please check your inbox.");
