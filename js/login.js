@@ -54,10 +54,18 @@
           const confirm = document.getElementById("authConfirm").value;
           if (!name) throw new Error("Please enter your name.");
           if (password !== confirm) throw new Error("Passwords do not match.");
+          
+          const redirectUrl =
+            `${window.location.origin}/personal-manager/login.html`;
           const { data, error } = await client.auth.signUp({
-            email, password, options: { data: { name } }
+            email,
+            password,
+            options: {
+              data: { name },
+              emailRedirectTo: redirectUrl
+            }
           });
-          if (error) throw error;
+            if (error) throw error;
           if (data.session) {
             await PM.unlockDocuments(password, data.user.id);
             location.href = "index.html";
