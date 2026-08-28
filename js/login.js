@@ -56,8 +56,9 @@
           if (password !== confirm) throw new Error("Passwords do not match.");
           
           const redirectUrl =
-            new URL("login.html", window.location.href).href;
-          const { data, error } = await client.auth.signUp({
+            "https://chandrud171989-collab.github.io/personal-manager/login.html";
+          
+            const { data, error } = await client.auth.signUp({
             email,
             password,
             options: {
