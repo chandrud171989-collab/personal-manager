@@ -94,31 +94,52 @@
    }
 
   const params = new URLSearchParams(window.location.search);
-const verified = params.get("verified") === "1";
 
-const { data } = await client.auth.getSession();
+  const verified = params.get("verified") === "1";
+  const reset = params.get("reset") === "1";
 
-if (verified) {
-  if (data.session) {
-    await client.auth.signOut({ scope: "local" });
+  const { data } = await client.auth.getSession();
+
+  if (verified) {
+
+    if (data.session) {
+      await client.auth.signOut({ scope: "local" });
+    }
+
+    window.history.replaceState(
+      {},
+      document.title,
+      window.location.pathname
+    );
+
+    render(
+      "login",
+      "Email verified successfully. Please enter your password to log in."
+    );
+
+    return;
   }
 
-  window.history.replaceState(
-    {},
-    document.title,
-    window.location.pathname
-  );
+  if (reset) {
 
-  render(
-    "login",
-    "Email verified successfully. Please enter your password to log in."
-  );
+    window.history.replaceState(
+      {},
+      document.title,
+      window.location.pathname
+    );
 
-  return;
-}
+    render(
+      "login",
+      "Password updated successfully. Please log in with your new password."
+    );
+
+    return;
+  }
 
 if (data.session?.user) {
+
   location.href = "index.html";
+
   return;
 }
 

@@ -121,15 +121,17 @@
         throw error;
       }
 
-      render(
-        "Password updated successfully. Redirecting to login..."
-      );
+    render(
+      "Password updated successfully. Please log in with your new password."
+    );
 
-      setTimeout(() => {
+    await client.auth.signOut({ scope: "local" });
 
-        window.location.href = "login.html";
+    setTimeout(() => {
 
-      }, 2000);
+      window.location.href = "login.html?reset=1";
+
+    }, 1500);
 
     } catch (error) {
 
