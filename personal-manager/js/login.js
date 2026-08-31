@@ -56,7 +56,7 @@
           if (password !== confirm) throw new Error("Passwords do not match.");
           
           const redirectUrl =
-            "https://cidstech.in/personal-manager/login.html";
+             "https://cidstech.in/personal-manager/login.html?verified=1";
           
             const { data, error } = await client.auth.signUp({
             email,
@@ -93,12 +93,34 @@
      return render("login", "Supabase client is not initialized.");
    }
 
-   const { data } = await client.auth.getSession();
+  const params = new URLSearchParams(window.location.search);
+const verified = params.get("verified") === "1";
 
-   if (data.session?.user) {
-     location.href = "index.html";
-     return;
-   }
+const { data } = await client.auth.getSession();
 
-   render("login");
+if (verified) {
+  if (data.session) {
+    await client.auth.signOut({ scope: "local" });
+  }
+
+  window.history.replaceState(
+    {},
+    document.title,
+    window.location.pathname
+  );
+
+  render(
+    "login",
+    "Email verified successfully. Please enter your password to log in."
+  );
+
+  return;
+}
+
+if (data.session?.user) {
+  location.href = "index.html";
+  return;
+}
+
+render("login");
 })();
