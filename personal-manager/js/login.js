@@ -123,4 +123,6 @@ if (data.session?.user) {
 }
 
 render("login");
+
+  })();
 })();
