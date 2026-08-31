@@ -1,4 +1,4 @@
-const CACHE = "pm-cache-v6";
+const CACHE = "pm-cache-v7";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -6,6 +6,7 @@ const APP_SHELL = [
   "./maintenance.html",
   "./finance.html",
   "./login.html",
+  "./reset-password.html",
   "./css/style.css",
   "./js/common.js",
   "./js/supabase-config.js",
@@ -14,9 +15,11 @@ const APP_SHELL = [
   "./js/maintenance.js",
   "./js/finance.js",
   "./js/login.js",
+  "./js/reset-password.js",
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png"
+  
 ];
 
 self.addEventListener("install", event => {

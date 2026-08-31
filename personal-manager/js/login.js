@@ -41,7 +41,7 @@
       try {
         if (reset) {
           const { error } = await client.auth.resetPasswordForEmail(email, {
-            redirectTo: "https://chandrud171989-collab.github.io/personal-manager/reset-password.html"
+            redirectTo: "https://cidstech.in/personal-manager/reset-password.html"
           });
           if (error) throw error;
           render("login", "Password reset email sent. Please check your inbox.");
@@ -56,7 +56,7 @@
           if (password !== confirm) throw new Error("Passwords do not match.");
           
           const redirectUrl =
-            "https://chandrud171989-collab.github.io/personal-manager/login.html";
+            "https://cidstech.in/personal-manager/login.html";
           
             const { data, error } = await client.auth.signUp({
             email,
