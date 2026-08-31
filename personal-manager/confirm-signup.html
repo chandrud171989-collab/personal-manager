@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0">
+
+  <meta
+    name="theme-color"
+    content="#12151a">
+
+  <title>Confirm Email - Personal Manager</title>
+
+  <link rel="stylesheet" href="css/style.css">
+
+</head>
+
+<body>
+
+  <div class="auth-page">
+
+    <div class="auth-logo">P</div>
+
+    <h1>Personal Manager</h1>
+
+    <p class="auth-subtitle">
+      Email verification
+    </p>
+
+    <div
+      id="message"
+      class="notice"
+      style="margin-top:16px;text-align:center">
+
+      Please click the button below to verify your email address.
+
+    </div>
+
+    <button
+      id="confirmBtn"
+      class="btn primary"
+      type="button"
+      style="width:100%;margin-top:20px">
+
+      Confirm Email
+
+    </button>
+
+  </div>
+
+  <script>
+
+    const params =
+      new URLSearchParams(window.location.search);
+
+    const confirmationUrl =
+      params.get("confirmation_url");
+
+    const button =
+      document.getElementById("confirmBtn");
+
+    const message =
+      document.getElementById("message");
+
+
+    if (!confirmationUrl) {
+
+      button.disabled = true;
+
+      message.textContent =
+        "This confirmation link is invalid or incomplete.";
+
+    }
+
+
+    button.addEventListener("click", () => {
+
+      if (!confirmationUrl) {
+        return;
+      }
+
+      window.location.href =
+        confirmationUrl;
+
+    });
+
+  </script>
+
+</body>
+
+</html>
