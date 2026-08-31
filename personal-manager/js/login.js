@@ -88,10 +88,18 @@
     document.getElementById("switchBtn")?.addEventListener("click", () => render(signup ? "login" : "signup"));
   }
 
-  (async () => {
-    if (!client) return render("login", "Supabase client is not initialized.");
+    (async () => {
+    if (!client) {
+      return render("login", "Supabase client is not initialized.");
+    }
+
     const { data } = await client.auth.getSession();
-    if (data.session?.user) location.href = "index.html";
-    else render("login");
+
+    if (data.session?.user) {
+      location.href = "index.html";
+    } else {
+      render("login");
+    }
   })();
+
 })();
