@@ -112,3 +112,89 @@ button{cursor:pointer}
 .password-toggle:hover {
   opacity: 1;
 }
+/* Shared Expenses */
+
+.shared-group-card,
+.invitation-card,
+.expense-row,
+.member-row,
+.balance-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  margin: 10px 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface2);
+}
+
+.shared-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.shared-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.shared-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.expense-amount {
+  font-size: 18px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.balance-positive {
+  color: var(--green);
+}
+
+.balance-negative {
+  color: var(--red);
+}
+
+.custom-split-row {
+  margin: 10px 0;
+}
+
+.shared-notice {
+  margin: 12px 0;
+}
+
+.shared-bottomnav {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+@media (max-width: 700px) {
+  .shared-header {
+    flex-direction: column;
+  }
+
+  .shared-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .shared-group-card,
+  .invitation-card,
+  .expense-row,
+  .member-row,
+  .balance-row {
+    align-items: flex-start;
+  }
+
+  .shared-bottomnav .navbtn {
+    font-size: 12px;
+  }
+}
