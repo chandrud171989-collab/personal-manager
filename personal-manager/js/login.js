@@ -69,14 +69,23 @@
             : `
               <div class="field">
                 <label>Password</label>
-                <input
-                  id="authPassword"
-                  type="password"
-                  autocomplete="${
-                    signup ? "new-password" : "current-password"
-                  }"
-                  placeholder="At least 6 characters"
-                >
+                <div class="password-field">
+                  <input
+                    id="authPassword"
+                    type="password"
+                    autocomplete="${
+                      signup ? "new-password" : "current-password"
+                    }"
+                    placeholder="At least 6 characters"
+                  >
+                  <button
+                    type="button"
+                    class="password-toggle"
+                    id="passwordToggle"
+                    aria-label="Show password"
+                    title="Show password"
+                  >👁</button>
+                </div>
               </div>
             `
         }
@@ -86,12 +95,21 @@
             ? `
               <div class="field">
                 <label>Confirm password</label>
-                <input
-                  id="authConfirm"
-                  type="password"
-                  autocomplete="new-password"
-                  placeholder="Re-enter password"
-                >
+                <div class="password-field">
+                  <input
+                    id="authConfirm"
+                    type="password"
+                    autocomplete="new-password"
+                    placeholder="Re-enter password"
+                  >
+                  <button
+                    type="button"
+                    class="password-toggle"
+                    id="confirmPasswordToggle"
+                    aria-label="Show password"
+                    title="Show password"
+                  >👁</button>
+                </div>
               </div>
             `
             : ""
@@ -158,6 +176,47 @@
 
       </div>
     `;
+
+    // Password visibility toggles
+    const passwordInput = document.getElementById("authPassword");
+    const passwordToggle = document.getElementById("passwordToggle");
+
+    passwordToggle?.addEventListener("click", () => {
+      if (!passwordInput) return;
+
+      const showPassword = passwordInput.type === "password";
+
+      passwordInput.type = showPassword ? "text" : "password";
+      passwordToggle.textContent = showPassword ? "🙈" : "👁";
+      passwordToggle.setAttribute(
+        "aria-label",
+        showPassword ? "Hide password" : "Show password"
+      );
+      passwordToggle.setAttribute(
+        "title",
+        showPassword ? "Hide password" : "Show password"
+      );
+    });
+
+    const confirmInput = document.getElementById("authConfirm");
+    const confirmToggle = document.getElementById("confirmPasswordToggle");
+
+    confirmToggle?.addEventListener("click", () => {
+      if (!confirmInput) return;
+
+      const showPassword = confirmInput.type === "password";
+
+      confirmInput.type = showPassword ? "text" : "password";
+      confirmToggle.textContent = showPassword ? "🙈" : "👁";
+      confirmToggle.setAttribute(
+        "aria-label",
+        showPassword ? "Hide password" : "Show password"
+      );
+      confirmToggle.setAttribute(
+        "title",
+        showPassword ? "Hide password" : "Show password"
+      );
+    });
 
     /*
      * Main authentication button
@@ -308,53 +367,27 @@
       }
     };
 
-    /*
-     * ENTER KEY SUPPORT
-     *
-     * Works for:
-     * - Email
-     * - Password
-     * - Confirm Password
-     */
-    document
-      .getElementById("authEmail")
-      ?.addEventListener("keydown", (e) => {
+    // Enter key support
+    document.getElementById("authEmail")?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        document.getElementById("authSubmit").click();
+      }
+    });
 
-        if (e.key === "Enter") {
-          e.preventDefault();
+    document.getElementById("authPassword")?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        document.getElementById("authSubmit").click();
+      }
+    });
 
-          document
-            .getElementById("authSubmit")
-            .click();
-        }
-      });
-
-    document
-      .getElementById("authPassword")
-      ?.addEventListener("keydown", (e) => {
-
-        if (e.key === "Enter") {
-          e.preventDefault();
-
-          document
-            .getElementById("authSubmit")
-            .click();
-        }
-      });
-
-    document
-      .getElementById("authConfirm")
-      ?.addEventListener("keydown", (e) => {
-
-        if (e.key === "Enter") {
-          e.preventDefault();
-
-          document
-            .getElementById("authSubmit")
-            .click();
-        }
-      });
-
+    document.getElementById("authConfirm")?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        document.getElementById("authSubmit").click();
+      }
+    });
     /*
      * NAVIGATION BUTTONS
      */

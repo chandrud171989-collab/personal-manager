@@ -82,3 +82,33 @@ button{cursor:pointer}
   .modal-actions{flex-direction:column}.detail-row{flex-direction:column;gap:5px}
   .fab{right:18px;bottom:96px;width:72px;height:72px}
 }
+.password-field {
+  position: relative;
+  width: 100%;
+}
+
+.password-field input {
+  width: 100%;
+  padding-right: 48px;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 17px;
+  opacity: 0.7;
+}
+
+.password-toggle:hover {
+  opacity: 1;
+}
