@@ -1,8 +1,42 @@
 (() => {
   "use strict";
   const PM = window.PM;
-  const ITEMS = ["AC","RO / Water Purifier","Refrigerator","Washing Machine","Geyser","Vehicle Service","Home Cleaning","Pest Control","Electrical/Plumbing","Other"];
-  const TYPES = ["Appliance","Vehicle","Service"];
+  const MAINTENANCE_ITEMS = {
+    "Vehicle Maintenance": [
+      "Car Service",
+      "Bike Service",
+      "PUC",
+      "Tyres",
+      "Battery",
+      "AC Service",
+      "Other"
+    ],
+    "Home Maintenance": [
+      "AC",
+      "Refrigerator",
+      "Washing Machine",
+      "Geyser",
+      "RO / Water Purifier",
+      "TV",
+      "Laptop",
+      "Computer",
+      "Printer",
+      "CCTV",
+      "UPS / Inverter",
+      "Microwave",
+      "Dishwasher",
+      "Electrical",
+      "Plumbing",
+      "Home Cleaning",
+      "Pest Control",
+      "Water Tank Cleaning",
+      "Painting",
+      "Other"
+    ],
+    "Other Maintenance": []
+  };
+
+  const TYPES = Object.keys(MAINTENANCE_ITEMS);
   const REM = [30,7,1];
   const view = document.getElementById("view");
 
@@ -131,15 +165,13 @@
             ${TYPES.map(t=>`<option value="${PM.escape(t)}" ${(old?.type===t) || (!old && t==="Appliance") ? "selected":""}>${PM.escape(t)}</option>`).join("")}
           </select>
         </div>
-        <div class="field">
+        <div class="field" id="itemSelectWrap">
           <label>Item</label>
-          <select id="itemSelect" name="item">
-            ${ITEMS.map(x=>`<option value="${PM.escape(x)}" ${(!old && x==="AC") || old?.item_name===x ? "selected":""}>${PM.escape(x)}</option>`).join("")}
-          </select>
+          <select id="itemSelect" name="item"></select>
         </div>
-        <div class="field" id="customItemWrap" style="display:${old && !ITEMS.includes(old.item_name) ? "block":"none"}">
+        <div class="field" id="customItemWrap" style="display:none">
           <label>Custom item name</label>
-          <input id="customItem" name="customItem" value="${PM.escape(old && !ITEMS.includes(old.item_name) ? old.item_name : "")}" placeholder="e.g. Water heater">
+          <input id="customItem" name="customItem" value="" placeholder="Enter item name">
         </div>
         <div class="field"><label>Last service date</label><input type="date" name="lastServiceDate" value="${PM.escape(old?.last_service_date || "")}" max="${today}"><small>Today or a past date only.</small></div>
         <div class="field"><label>Service due date</label><input type="date" name="nextServiceDate" required value="${PM.escape(old?.next_service_date || "")}" min="${today}"><small>Today or a future date only.</small></div>
@@ -163,9 +195,49 @@
         </div>
       </form>`);
 
-    const itemSelect=document.getElementById("itemSelect");
-    const customItemWrap=document.getElementById("customItemWrap");
-    itemSelect.onchange=()=>customItemWrap.style.display=itemSelect.value==="Other"?"block":"none";
+    const typeSelect = document.getElementById("typeSelect");
+    const itemSelect = document.getElementById("itemSelect");
+    const itemSelectWrap = document.getElementById("itemSelectWrap");
+    const customItemWrap = document.getElementById("customItemWrap");
+    const customItem = document.getElementById("customItem");
+
+    function updateItemOptions(selectedItem = "") {
+      const type = typeSelect.value;
+      const items = MAINTENANCE_ITEMS[type] || [];
+      const isOtherMaintenance = type === "Other Maintenance";
+
+      if (isOtherMaintenance) {
+        itemSelectWrap.style.display = "none";
+        customItemWrap.style.display = "block";
+        customItem.value = selectedItem || "";
+        return;
+      }
+
+      itemSelectWrap.style.display = "block";
+      itemSelect.innerHTML = items.map(item =>
+        `<option value="${PM.escape(item)}" ${selectedItem === item ? "selected" : ""}>${PM.escape(item)}</option>`
+      ).join("");
+
+      if (!selectedItem || !items.includes(selectedItem)) {
+        itemSelect.value = items[0] || "Other";
+      }
+
+      customItemWrap.style.display = itemSelect.value === "Other" ? "block" : "none";
+
+      if (itemSelect.value !== "Other") {
+        customItem.value = "";
+      } else if (selectedItem && !items.includes(selectedItem)) {
+        customItem.value = selectedItem;
+      }
+    }
+
+    typeSelect.onchange = () => updateItemOptions();
+    itemSelect.onchange = () => {
+      customItemWrap.style.display = itemSelect.value === "Other" ? "block" : "none";
+      if (itemSelect.value !== "Other") customItem.value = "";
+    };
+
+    updateItemOptions(old?.item_name || "");
 
     const chips=[...document.querySelectorAll("#maintRem .chip-toggle[data-val]")];
     const customBtn=document.getElementById("customRemBtn");
@@ -191,10 +263,21 @@
       btn.disabled=true;btn.textContent="Saving...";
       try{
         const fd=new FormData(e.target);
-        const type=String(fd.get("type")||"Appliance");
-        const selected=String(fd.get("item")||"Other");
-        const custom=String(fd.get("customItem")||"").trim();
-        const itemName=selected==="Other"?(custom||"Other item"):selected;
+        const type = String(fd.get("type") || "Home Maintenance");
+        const selected = String(fd.get("item") || "Other");
+        const custom = String(fd.get("customItem") || "").trim();
+
+        let itemName;
+
+        if (type === "Other Maintenance") {
+          if (!custom) throw new Error("Please enter the maintenance item name.");
+          itemName = custom;
+        } else if (selected === "Other") {
+          if (!custom) throw new Error("Please enter the custom item name.");
+          itemName = custom;
+        } else {
+          itemName = selected;
+        }
         const last=String(fd.get("lastServiceDate")||"")||null;
         const next=String(fd.get("nextServiceDate")||"");
         const costText=String(fd.get("cost")||"");
