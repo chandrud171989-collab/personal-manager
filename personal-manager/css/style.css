@@ -62,7 +62,7 @@ button{cursor:pointer}
 .modal-actions{display:flex;gap:12px;margin-top:20px}
 .modal-actions .btn{flex:1}
 .detail-row{display:flex;justify-content:space-between;gap:20px;padding:12px 0;border-bottom:1px solid var(--border)}
-.bottomnav{position:fixed;left:0;right:0;bottom:0;height:82px;background:#1a2028;border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(4,1fr);z-index:40}
+.bottomnav{position:fixed;left:0;right:0;bottom:0;height:82px;background:#1a2028;border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(5,1fr);z-index:40}
 .navbtn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:var(--dim);font-weight:800;text-decoration:none}
 .navbtn.active{color:var(--teal)}
 .fab{position:fixed;right:24px;bottom:100px;width:78px;height:78px;border:0;border-radius:50%;background:var(--teal);color:#071310;font-size:42px;box-shadow:0 14px 32px rgba(45,212,191,.24);z-index:50}
