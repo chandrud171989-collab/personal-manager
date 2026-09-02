@@ -61,41 +61,28 @@
     await renderGroups();
   }
 
-  async function getGroups() {
-    const { data, error } = await client
-      .from("shared_expense_group_members")
-      .select(`
-        group_id,
-        role,
-        shared_expense_groups (
-          id,
-          name,
-          created_by,
-          created_at
-        )
-      `)
-      .eq("user_id", currentUser.id);
+    async function getGroups() {
+      const { data, error } = await client.rpc(
+        "get_shared_expense_groups"
+      );
 
-    if (error) throw error;
+      if (error) throw error;
 
-    return (data || [])
-      .map(row => ({
-        ...row.shared_expense_groups,
-        role: row.role
-      }))
-      .filter(Boolean);
-  }
+      return data || [];
+    }
 
-  async function getGroupMembers(groupId) {
-    const { data, error } = await client
-      .from("shared_expense_group_members")
-      .select("user_id, role, joined_at")
-      .eq("group_id", groupId);
+    async function getGroupMembers(groupId) {
+      const { data, error } = await client.rpc(
+        "get_shared_expense_group_members",
+        {
+          p_group_id: groupId
+        }
+      );
 
-    if (error) throw error;
+      if (error) throw error;
 
-    return data || [];
-  }
+      return data || [];
+    }
 
   async function getExpenses(groupId) {
     const { data, error } = await client
@@ -324,8 +311,10 @@
         ${members.map(member => `
           <div class="member-row">
             <div>
-              <strong>${member.user_id === currentUser.id ? "You" : esc(member.user_id)}</strong>
-              <div class="card-sub">${member.role}</div>
+              <strong>${member.user_id === currentUser.id ? "You" : esc(member.name || member.email || "Member")}</strong>
+              <div class="card-sub">
+                ${member.role}${member.email ? ` · ${esc(member.email)}` : ""}
+              </div>
             </div>
           </div>
         `).join("")}
@@ -411,7 +400,7 @@
       if (Math.abs(balance) < 0.005) {
         return `
           <div class="balance-row">
-            <span>${member.user_id === currentUser.id ? "You" : esc(member.user_id)}</span>
+            <span>${member.user_id === currentUser.id ? "You" : esc(member.name || member.email || "Member")}</span>
             <strong>Settled</strong>
           </div>
         `;
@@ -419,7 +408,7 @@
 
       return `
         <div class="balance-row">
-          <span>${member.user_id === currentUser.id ? "You" : esc(member.user_id)}</span>
+          <span>${member.user_id === currentUser.id ? "You" : esc(member.name || member.email || "Member")}</span>
           <strong class="${balance > 0 ? "balance-positive" : "balance-negative"}">
             ${balance > 0 ? "+" : "-"}${money(Math.abs(balance))}
           </strong>
