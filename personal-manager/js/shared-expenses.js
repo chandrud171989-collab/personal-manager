@@ -264,8 +264,8 @@
       closeModal();
       await renderGroups("Group created successfully.");
     });
-
-  async function openGroup(groupId) {
+    }
+    async function openGroup(groupId) {
     try {
       const groups = await getGroups();
       currentGroup = groups.find(g => g.id === groupId);
