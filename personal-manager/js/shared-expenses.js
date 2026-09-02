@@ -522,11 +522,11 @@
         </div>
         <div class="stat-card">
           <div class="stat-num">${money(Math.max(myBalance, 0))}</div>
-          <div class="stat-label">You are owed</div>
+          <div class="stat-label">You get</div>
         </div>
         <div class="stat-card">
           <div class="stat-num">${money(Math.max(-myBalance, 0))}</div>
-          <div class="stat-label">You owe</div>
+          <div class="stat-label">You pay</div>
         </div>
       </div>
 
