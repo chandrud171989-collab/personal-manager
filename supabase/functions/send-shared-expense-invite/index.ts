@@ -22,12 +22,14 @@ Deno.serve(async (req) => {
       email,
       groupName,
       inviterName,
+      invitationId
     } = await req.json();
 
-    if (!email || !groupName) {
-      throw new Error("Email and group name are required");
+    if (!email || !groupName || !invitationId) {
+      throw new Error("Email, group name and invitation ID are required");
     }
-
+    const invitationUrl =
+  `https://cidstech.in/personal-manager/shared-expenses.html?invitation=${encodeURIComponent(invitationId)}`;
     const response = await fetch(
       "https://api.brevo.com/v3/smtp/email",
       {
@@ -64,7 +66,7 @@ Deno.serve(async (req) => {
 
               <p style="margin:30px 0;">
                 <a
-                  href="https://cidstech.in/personal-manager/shared-expenses.html"
+                  href="${invitationUrl}"
                   style="background:#2dd4bf;color:#12151a;padding:14px 22px;border-radius:8px;text-decoration:none;font-weight:bold;"
                 >
                   Open Shared Expenses
