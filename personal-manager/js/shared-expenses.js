@@ -429,57 +429,86 @@
   }
 
   function openInviteForm() {
-    if (currentGroup.role !== "owner") {
-      alert("Only the group owner can invite members.");
+  if (currentGroup.role !== "owner") {
+    alert("Only the group owner can invite members.");
+    return;
+  }
+
+  openModal(`
+    <div class="modal-title">Invite Member</div>
+    <form id="inviteForm">
+      <div class="field">
+        <label>Personal Manager email</label>
+        <input id="inviteEmail" type="email" required placeholder="member@example.com">
+        <small>The user must have a Personal Manager account.</small>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn" id="cancelInvite">Cancel</button>
+        <button type="submit" class="btn primary">Send Invitation</button>
+      </div>
+    </form>
+  `);
+
+  document.getElementById("cancelInvite").addEventListener("click", closeModal);
+
+  document.getElementById("inviteForm").addEventListener("submit", async e => {
+    e.preventDefault();
+
+    const email = document.getElementById("inviteEmail").value.trim().toLowerCase();
+
+    if (email === (currentUser.email || "").toLowerCase()) {
+      alert("You are already a member of this group.");
       return;
     }
 
-    openModal(`
-      <div class="modal-title">Invite Member</div>
-      <form id="inviteForm">
-        <div class="field">
-          <label>Personal Manager email</label>
-          <input id="inviteEmail" type="email" required placeholder="member@example.com">
-          <small>The user must have a Personal Manager account.</small>
-        </div>
-
-        <div class="modal-actions">
-          <button type="button" class="btn" id="cancelInvite">Cancel</button>
-          <button type="submit" class="btn primary">Send Invitation</button>
-        </div>
-      </form>
-    `);
-
-    document.getElementById("cancelInvite").addEventListener("click", closeModal);
-
-    document.getElementById("inviteForm").addEventListener("submit", async e => {
-      e.preventDefault();
-
-      const email = document.getElementById("inviteEmail").value.trim().toLowerCase();
-
-      if (email === (currentUser.email || "").toLowerCase()) {
-        alert("You are already a member of this group.");
-        return;
+    const { error: invitationError } = await client.rpc(
+      "create_shared_expense_invitation",
+      {
+        p_group_id: currentGroup.id,
+        p_email: email
       }
+    );
 
-      const { error } = await client.rpc(
-        "create_shared_expense_invitation",
-        {
-          p_group_id: currentGroup.id,
-          p_email: email
+    if (invitationError) {
+      alert(invitationError.message);
+      return;
+    }
+
+    // Send invitation email through Supabase Edge Function
+    const { data: emailResult, error: emailError } = await client.functions.invoke(
+      "send-shared-expense-invite",
+      {
+        body: {
+          email: email,
+          groupName: currentGroup.name,
+          inviterName: currentUser.user_metadata?.name || currentUser.email
         }
-      );
-
-      if (error) {
-        alert(error.message);
-        return;
       }
+    );
+
+    if (emailError) {
+      console.error("Invitation email error:", emailError);
 
       closeModal();
-      alert("Invitation created. The member can accept it from Shared Expenses.");
-    });
-  }
 
+      alert(
+        "Invitation was created, but the email could not be sent.\n\n" +
+        "The member can still find the invitation in Shared Expenses."
+      );
+
+      return;
+    }
+
+    if (emailResult?.success) {
+      closeModal();
+      alert("Invitation sent successfully by email.");
+    } else {
+      closeModal();
+      alert("Invitation was created, but the email status could not be confirmed.");
+    }
+  });
+}
   async function acceptInvitation(invitationId) {
     const { error } = await client.rpc(
       "accept_shared_expense_invitation",
