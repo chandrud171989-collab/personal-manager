@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           sender: {
             name: "Personal Manager",
-            email: "support@cidstech.in",
+            email: "no-reply@cidstech.in",
           },
           to: [
             {
@@ -81,6 +81,7 @@ Deno.serve(async (req) => {
     );
 
     const result = await response.json();
+
 
     if (!response.ok) {
       console.error("Brevo error:", result);
