@@ -214,6 +214,18 @@
     return data || [];
   }
 
+  async function getSettlements(groupId) {
+  const { data, error } = await client
+    .from("shared_expense_settlements")
+    .select("*")
+    .eq("group_id", groupId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
+  return data || [];
+}
+
   async function renderGroups(message = "") {
     try {
       const groups = await getGroups();
@@ -501,8 +513,14 @@
     const members = await getGroupMembers(currentGroup.id);
     const expenses = await getExpenses(currentGroup.id);
     const splits = await getSplits(expenses.map(e => e.id));
+    const settlements = await getSettlements(currentGroup.id);
 
-    const balances = calculateBalances(expenses, splits, members);
+    const balances = calculateBalances(
+      expenses,
+      splits,
+      settlements,
+      members
+    );
     const myBalance = balances[currentUser.id] || 0;
 
     view.innerHTML = `
@@ -705,26 +723,59 @@ document
   });
 }
 
-  function calculateBalances(expenses, splits, members) {
-    const balances = {};
-    members.forEach(m => balances[m.user_id] = 0);
+  function calculateBalances(expenses, splits, settlements, members) {
+  const balances = {};
 
-    expenses.forEach(expense => {
-      const paidBy = expense.paid_by;
-      if (balances[paidBy] === undefined) balances[paidBy] = 0;
+  members.forEach(m => {
+    balances[m.user_id] = 0;
+  });
 
-      balances[paidBy] += Number(expense.amount);
+  // Calculate balances from expenses
+  expenses.forEach(expense => {
+    const paidBy = expense.paid_by;
 
-      splits
-        .filter(s => s.expense_id === expense.id)
-        .forEach(split => {
-          if (balances[split.user_id] === undefined) balances[split.user_id] = 0;
-          balances[split.user_id] -= Number(split.share_amount);
-        });
-    });
+    if (balances[paidBy] === undefined) {
+      balances[paidBy] = 0;
+    }
 
-    return balances;
-  }
+    // Person who paid gets credit
+    balances[paidBy] += Number(expense.amount);
+
+    // Each person's share is deducted
+    splits
+      .filter(s => s.expense_id === expense.id)
+      .forEach(split => {
+        if (balances[split.user_id] === undefined) {
+          balances[split.user_id] = 0;
+        }
+
+        balances[split.user_id] -= Number(split.share_amount);
+      });
+  });
+
+  // Apply settlements
+  settlements.forEach(settlement => {
+    const fromUser = settlement.from_user;
+    const toUser = settlement.to_user;
+    const amount = Number(settlement.amount);
+
+    if (balances[fromUser] === undefined) {
+      balances[fromUser] = 0;
+    }
+
+    if (balances[toUser] === undefined) {
+      balances[toUser] = 0;
+    }
+
+    // Person who pays reduces what they owe
+    balances[fromUser] += amount;
+
+    // Person receiving money reduces what they should receive
+    balances[toUser] -= amount;
+  });
+
+  return balances;
+}
 
   function renderBalanceRows(balances, members) {
   return members.map(member => {
