@@ -246,39 +246,24 @@
       e.preventDefault();
 
       const name = document.getElementById("groupName").value.trim();
+
       if (!name) return;
 
-      const { data: group, error } = await client
-        .from("shared_expense_groups")
-        .insert({
-          name,
-          created_by: currentUser.id
-        })
-        .select()
-        .single();
+      const { data: groupId, error } = await client.rpc(
+        "create_shared_expense_group",
+        {
+          p_name: name
+        }
+      );
 
       if (error) {
         alert(error.message);
         return;
       }
 
-      const { error: memberError } = await client
-        .from("shared_expense_group_members")
-        .insert({
-          group_id: group.id,
-          user_id: currentUser.id,
-          role: "owner"
-        });
-
-      if (memberError) {
-        alert(memberError.message);
-        return;
-      }
-
       closeModal();
       await renderGroups("Group created successfully.");
     });
-  }
 
   async function openGroup(groupId) {
     try {
