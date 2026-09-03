@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "cids.pm",
+      "sha256_cert_fingerprints": [
+        "43:4A:CD:BD:EF:2D:53:AB:48:6B:96:62:6C:42:53:A4:90:CA:DF:6E:42:24:42:6A:7D:E8:B4:54:18:35:20:87"
+      ]
+    }
+  }
+]
