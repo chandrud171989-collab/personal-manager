@@ -3,7 +3,23 @@
 
   const client = window.supabaseClient;
   const app = document.getElementById("app");
+  async function signInWithPasskey() {
+  if (!client?.auth?.signInWithPasskey) {
+    throw new Error("Passkey login is not available.");
+  }
 
+  const { data, error } = await client.auth.signInWithPasskey();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data?.user) {
+    throw new Error("Passkey authentication failed.");
+  }
+
+  return data.user;
+}
   function esc(v) {
     return window.PM?.escape
       ? window.PM.escape(v)
@@ -129,7 +145,7 @@
                 : "Login"
           }
         </button>
-
+         
         ${
           !reset
             ? `
@@ -141,6 +157,27 @@
               >
                 Forgot Password?
               </button>
+              ${
+                !signup && !reset
+                  ? `
+                    <button
+                      class="btn"
+                      id="passkeyBtn"
+                      type="button"
+                      style="width:100%;margin-top:12px"
+                    >
+                      🔐 Sign in with fingerprint
+                    </button>
+
+                    <div
+                      class="notice"
+                      style="margin-top:8px;text-align:center;font-size:13px"
+                    >
+                      Fingerprint, face unlock, or device PIN
+                    </div>
+                  `
+                  : ""
+              }      
 
               <div
                 class="notice"
@@ -366,6 +403,57 @@
         );
       }
     };
+
+        /*
+     * PASSKEY LOGIN
+     */
+    document.getElementById("passkeyBtn")?.addEventListener("click", async () => {
+      const btn = document.getElementById("passkeyBtn");
+
+      if (!btn) return;
+
+      btn.disabled = true;
+      btn.textContent = "Authenticating...";
+
+      try {
+        const user = await signInWithPasskey();
+
+        /*
+         * Passkey authentication succeeded.
+         *
+         * Restore the document encryption key that was
+         * previously saved on this device.
+         */
+        const restored = await PM.restoreDocumentKey(user.id);
+
+        if (!restored) {
+          /*
+           * The user is authenticated, but this device
+           * does not have the document encryption key.
+           *
+           * Keep password login as the fallback.
+           */
+          await client.auth.signOut({ scope: "local" });
+
+          render(
+            "login",
+            "Fingerprint login is not yet available on this device. Please log in with your password first."
+          );
+
+          return;
+        }
+
+        location.href = "index.html";
+
+      } catch (e) {
+        console.error("Passkey login error:", e);
+
+        render(
+          "login",
+          e.message || "Fingerprint login failed. Please use your password."
+        );
+      }
+    });
 
     // Enter key support
     document.getElementById("authEmail")?.addEventListener("keydown", (e) => {
