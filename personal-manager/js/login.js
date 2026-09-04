@@ -3,11 +3,116 @@
 
   const client = window.supabaseClient;
   const app = document.getElementById("app");
+  const PASSKEY_PROMPT_KEY = "pm_passkey_prompt_dismissed";
   async function signInWithPasskey() {
   if (!client?.auth?.signInWithPasskey) {
     throw new Error("Passkey login is not available.");
   }
 
+  async function showPasskeySetupPrompt() {
+  return new Promise((resolve) => {
+    PM.modal(`
+      <div style="text-align:center;">
+        <div style="font-size:32px;margin-bottom:10px;">🔐</div>
+
+        <div style="font-weight:800;font-size:18px;">
+          Enable Fingerprint Login?
+        </div>
+
+        <div class="status" style="margin-top:8px;">
+          Sign in faster next time using your fingerprint,
+          face unlock, or device PIN.
+        </div>
+
+        <button
+          class="btn primary"
+          id="loginEnablePasskeyBtn"
+          type="button"
+          style="width:100%;margin-top:18px;"
+        >
+          Enable Fingerprint Login
+        </button>
+
+        <button
+          class="btn"
+          id="loginSkipPasskeyBtn"
+          type="button"
+          style="width:100%;margin-top:10px;"
+        >
+          Not Now
+        </button>
+
+        <div
+          id="loginPasskeyStatus"
+          class="status"
+          style="text-align:center;margin-top:10px;"
+        ></div>
+      </div>
+    `);
+
+    document
+      .getElementById("loginSkipPasskeyBtn")
+      ?.addEventListener("click", () => {
+        localStorage.setItem(PASSKEY_PROMPT_KEY, "1");
+        PM.closeModal();
+        resolve();
+      });
+
+    document
+      .getElementById("loginEnablePasskeyBtn")
+      ?.addEventListener("click", async () => {
+        const btn = document.getElementById("loginEnablePasskeyBtn");
+        const status = document.getElementById("loginPasskeyStatus");
+
+        if (!btn) return;
+
+        btn.disabled = true;
+        btn.textContent = "Registering...";
+
+        try {
+          if (!client?.auth?.registerPasskey) {
+            throw new Error(
+              "Passkey registration is not available."
+            );
+          }
+
+          const { error } =
+            await client.auth.registerPasskey();
+
+          if (error) throw error;
+
+          localStorage.setItem(PASSKEY_PROMPT_KEY, "1");
+
+          btn.textContent = "✓ Enabled";
+
+          if (status) {
+            status.textContent =
+              "Fingerprint login enabled successfully.";
+          }
+
+          setTimeout(() => {
+            PM.closeModal();
+            resolve();
+          }, 1000);
+
+        } catch (error) {
+          console.error(
+            "Passkey registration error:",
+            error
+          );
+
+          btn.disabled = false;
+          btn.textContent = "Enable Fingerprint Login";
+
+          if (status) {
+            status.textContent =
+              error?.message ||
+              "Passkey registration failed.";
+          }
+        }
+      });
+  });
+}
   const { data, error } = await client.auth.signInWithPasskey();
 
   if (error) {
@@ -392,8 +497,12 @@
           password,
           data.user.id
         );
-        
+
         PM.markSessionUnlocked();
+
+        if (!localStorage.getItem(PASSKEY_PROMPT_KEY)) {
+          await showPasskeySetupPrompt();
+        }
 
         location.href = "index.html";
 
