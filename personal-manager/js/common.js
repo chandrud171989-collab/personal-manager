@@ -7,6 +7,141 @@
   const PM = window.PM = window.PM || {};
   PM.client = window.supabaseClient;
 
+    /* ---------- Security / Auto-lock ---------- */
+
+  const SESSION_UNLOCKED_KEY = "pm_session_unlocked";
+  const AUTO_LOCK_HIDDEN_AT_KEY = "pm_auto_lock_hidden_at";
+  const AUTO_LOCK_MS = 60 * 1000;
+  PM.markSessionUnlocked = () => {
+  try {
+    sessionStorage.setItem(SESSION_UNLOCKED_KEY, "1");
+  } catch (_) {}
+};
+
+PM.isSessionUnlocked = () => {
+  try {
+    return sessionStorage.getItem(SESSION_UNLOCKED_KEY) === "1";
+  } catch (_) {
+    return false;
+  }
+};
+
+PM.clearSessionUnlocked = () => {
+  try {
+    sessionStorage.removeItem(SESSION_UNLOCKED_KEY);
+    sessionStorage.removeItem(AUTO_LOCK_HIDDEN_AT_KEY);
+  } catch (_) {}
+};
+
+  let autoLockTimer = null;
+  let appIsLocked = false;
+
+    /* ---------- Automatic background lock ---------- */
+
+  PM.autoLock = async () => {
+    if (appIsLocked) return;
+
+    appIsLocked = true;
+
+    const uid = PM.user?.id || null;
+
+    // Stop any pending timer.
+    if (autoLockTimer) {
+      clearTimeout(autoLockTimer);
+      autoLockTimer = null;
+    }
+
+    // Remove the temporary authentication state.
+    PM.clearSessionUnlocked();
+
+    // Remove the encryption key from memory.
+    PM.clearDocumentKey(uid);
+
+    // Sign out only this device/session.
+    try {
+      if (PM.client) {
+        await PM.client.auth.signOut({ scope: "local" });
+      }
+    } catch (error) {
+      console.error("Auto-lock sign-out error:", error);
+    }
+
+    location.href = "login.html";
+  };
+
+  function scheduleAutoLock() {
+    if (!PM.isSessionUnlocked()) return;
+
+    if (autoLockTimer) {
+      clearTimeout(autoLockTimer);
+    }
+
+    try {
+      sessionStorage.setItem(
+        AUTO_LOCK_HIDDEN_AT_KEY,
+        String(Date.now())
+      );
+    } catch (_) {}
+
+    autoLockTimer = setTimeout(async () => {
+      if (!document.hidden) return;
+
+      const hiddenAt = Number(
+        sessionStorage.getItem(AUTO_LOCK_HIDDEN_AT_KEY) || 0
+      );
+
+      if (
+        hiddenAt &&
+        Date.now() - hiddenAt >= AUTO_LOCK_MS
+      ) {
+        await PM.autoLock();
+      }
+    }, AUTO_LOCK_MS + 100);
+  }
+
+  function cancelAutoLock() {
+    if (autoLockTimer) {
+      clearTimeout(autoLockTimer);
+      autoLockTimer = null;
+    }
+
+    try {
+      sessionStorage.removeItem(AUTO_LOCK_HIDDEN_AT_KEY);
+    } catch (_) {}
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (!PM.isSessionUnlocked()) return;
+
+    if (document.hidden) {
+      scheduleAutoLock();
+    } else {
+      const hiddenAt = Number(
+        sessionStorage.getItem(AUTO_LOCK_HIDDEN_AT_KEY) || 0
+      );
+
+      if (
+        hiddenAt &&
+        Date.now() - hiddenAt >= AUTO_LOCK_MS
+      ) {
+        PM.autoLock();
+      } else {
+        cancelAutoLock();
+      }
+    }
+  });
+
+  window.addEventListener("pagehide", () => {
+    if (!PM.isSessionUnlocked()) return;
+
+    try {
+      sessionStorage.setItem(
+        AUTO_LOCK_HIDDEN_AT_KEY,
+        String(Date.now())
+      );
+    } catch (_) {}
+  });
+
   PM.escape = (value) => {
     const div = document.createElement("div");
     div.textContent = value == null ? "" : String(value);
@@ -69,28 +204,72 @@
   };
 
   PM.requireAuth = async () => {
-    if (!PM.client) {
-      throw new Error("Supabase client is not initialized.");
+  if (!PM.client) {
+    throw new Error("Supabase client is not initialized.");
+  }
+
+  // Require this app session to have been explicitly unlocked.
+  if (!PM.isSessionUnlocked()) {
+    try {
+      await PM.client.auth.signOut({ scope: "local" });
+    } catch (_) {}
+
+    location.href = "login.html";
+    throw new Error("Authentication required.");
+  }
+
+  // Check whether the app was in the background too long.
+  try {
+    const hiddenAt = Number(
+      sessionStorage.getItem(AUTO_LOCK_HIDDEN_AT_KEY) || 0
+    );
+
+    if (hiddenAt) {
+      const elapsed = Date.now() - hiddenAt;
+
+      if (elapsed >= AUTO_LOCK_MS) {
+        await PM.autoLock();
+        throw new Error("Session locked.");
+      }
+
+      // Returned before the 1-minute timeout.
+      sessionStorage.removeItem(AUTO_LOCK_HIDDEN_AT_KEY);
     }
-    const { data, error } = await PM.client.auth.getSession();
-    if (error) throw error;
-    if (!data.session?.user) {
-      location.href = "login.html";
-      throw new Error("Authentication session missing.");
+  } catch (error) {
+    if (error?.message === "Session locked.") {
+      throw error;
     }
-    PM.user = data.session.user;
-    if (!PM.documentKey) {
-      try { await PM.restoreDocumentKey(PM.user.id); } catch (_) {}
-    }
-    return PM.user;
-  };
+  }
+
+  const { data, error } = await PM.client.auth.getSession();
+
+  if (error) throw error;
+
+  if (!data.session?.user) {
+    PM.clearSessionUnlocked();
+    location.href = "login.html";
+    throw new Error("Authentication session missing.");
+  }
+
+  PM.user = data.session.user;
+
+  // Restore the secure document encryption key.
+  if (!PM.documentKey) {
+    try {
+      await PM.restoreDocumentKey(PM.user.id);
+    } catch (_) {}
+  }
+
+  return PM.user;
+};
 
   PM.logout = async () => {
     const uid = PM.user?.id || null;
     try {
-      if (PM.client) await PM.client.auth.signOut();
+      if (PM.client) await PM.client.auth.signOut({ scope: "local" });
     } finally {
       PM.clearDocumentKey(uid);
+      PM.clearSessionUnlocked();
       location.href = "login.html";
     }
   };
@@ -140,31 +319,132 @@
     if (root) root.innerHTML = "";
   };
 
+    /* ---------- Client-side document encryption ---------- */
 
-  /* ---------- Client-side document encryption ---------- */
   const CRYPTO_PREFIX = "pm_doc_key_v1_";
   const CRYPTO_SALT_PREFIX = "PersonalManager-DocumentKey-v1:";
+
+  /*
+   * Secure document-key storage
+   *
+   * The actual CryptoKey is stored in IndexedDB.
+   * It is non-extractable, so JavaScript cannot export the key again.
+   *
+   * A legacy localStorage key is still supported temporarily so
+   * existing users can be migrated without losing access to documents.
+   */
+
+  const KEY_DB_NAME = "PersonalManagerSecureKeys";
+  const KEY_DB_VERSION = 1;
+  const KEY_STORE_NAME = "documentKeys";
+
+  let keyDbPromise = null;
+
+  function openKeyDatabase() {
+    if (keyDbPromise) return keyDbPromise;
+
+    keyDbPromise = new Promise((resolve, reject) => {
+      const request = indexedDB.open(KEY_DB_NAME, KEY_DB_VERSION);
+
+      request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+
+        if (!db.objectStoreNames.contains(KEY_STORE_NAME)) {
+          db.createObjectStore(KEY_STORE_NAME, {
+            keyPath: "userId"
+          });
+        }
+      };
+
+      request.onsuccess = () => resolve(request.result);
+
+      request.onerror = () => {
+        keyDbPromise = null;
+        reject(request.error);
+      };
+    });
+
+    return keyDbPromise;
+  }
+
+  async function saveSecureKey(userId, key) {
+    const db = await openKeyDatabase();
+
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(KEY_STORE_NAME, "readwrite");
+      const store = tx.objectStore(KEY_STORE_NAME);
+
+      store.put({
+        userId,
+        key
+      });
+
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error || new Error("Unable to save document key."));
+    });
+  }
+
+  async function loadSecureKey(userId) {
+    const db = await openKeyDatabase();
+
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(KEY_STORE_NAME, "readonly");
+      const request = tx.objectStore(KEY_STORE_NAME).get(userId);
+
+      request.onsuccess = () => {
+        resolve(request.result?.key || null);
+      };
+
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async function deleteSecureKey(userId) {
+    if (!userId) return;
+
+    const db = await openKeyDatabase();
+
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(KEY_STORE_NAME, "readwrite");
+
+      tx.objectStore(KEY_STORE_NAME).delete(userId);
+
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error || new Error("Unable to delete document key."));
+    });
+  }
 
   function b64(bytes) {
     let s = "";
     const arr = new Uint8Array(bytes);
+
     for (let i = 0; i < arr.length; i += 0x8000) {
       s += String.fromCharCode(...arr.subarray(i, i + 0x8000));
     }
+
     return btoa(s);
   }
 
   function unb64(text) {
     const s = atob(text);
     const out = new Uint8Array(s.length);
-    for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+
+    for (let i = 0; i < s.length; i++) {
+      out[i] = s.charCodeAt(i);
+    }
+
     return out;
   }
 
   PM.deriveDocumentKey = async (password, userId) => {
-    if (!password || !userId) throw new Error("Unable to unlock document encryption.");
+    if (!password || !userId) {
+      throw new Error("Unable to unlock document encryption.");
+    }
 
     const enc = new TextEncoder();
+
     const material = await crypto.subtle.importKey(
       "raw",
       enc.encode(password),
@@ -173,8 +453,17 @@
       ["deriveKey"]
     );
 
-    const salt = enc.encode(CRYPTO_SALT_PREFIX + userId);
+    const salt = enc.encode(
+      CRYPTO_SALT_PREFIX + userId
+    );
 
+    /*
+     * IMPORTANT:
+     * The derived key is now non-extractable.
+     *
+     * It can still encrypt/decrypt documents, but JavaScript
+     * cannot export the raw AES key.
+     */
     return crypto.subtle.deriveKey(
       {
         name: "PBKDF2",
@@ -183,43 +472,159 @@
         hash: "SHA-256"
       },
       material,
-      { name: "AES-GCM", length: 256 },
-      true,
+      {
+        name: "AES-GCM",
+        length: 256
+      },
+      false,
       ["encrypt", "decrypt"]
     );
   };
 
   PM.saveDocumentKey = async (key, userId) => {
-    const raw = await crypto.subtle.exportKey("raw", key);
-    localStorage.setItem(CRYPTO_PREFIX + userId, b64(raw));
+    if (!key || !userId) {
+      throw new Error("Unable to save document encryption key.");
+    }
+
+    /*
+     * Store the CryptoKey directly in IndexedDB.
+     *
+     * The key is non-extractable, so the application cannot
+     * retrieve the raw AES key as text or Base64.
+     */
+    await saveSecureKey(userId, key);
+
+    /*
+     * Remove the old localStorage copy after successful migration.
+     */
+    try {
+      localStorage.removeItem(CRYPTO_PREFIX + userId);
+    } catch (_) {}
   };
 
   PM.restoreDocumentKey = async (userId) => {
-    const stored = localStorage.getItem(CRYPTO_PREFIX + userId);
-    if (!stored) return false;
+    if (!userId) return false;
 
-    const key = await crypto.subtle.importKey(
-      "raw",
-      unb64(stored),
-      { name: "AES-GCM" },
-      true,
-      ["encrypt", "decrypt"]
-    );
+    /*
+     * 1. First try the secure IndexedDB key.
+     */
+    try {
+      const secureKey = await loadSecureKey(userId);
 
-    PM.documentKey = key;
-    return true;
+      if (secureKey) {
+        PM.documentKey = secureKey;
+        return true;
+      }
+    } catch (error) {
+      console.error("Secure document key restore failed:", error);
+    }
+
+    /*
+     * 2. Migration path for existing users.
+     *
+     * Older versions stored the raw AES key in localStorage.
+     * Import it as NON-EXTRACTABLE, move it to IndexedDB,
+     * then delete the old localStorage copy.
+     */
+    let stored = null;
+
+    try {
+      stored = localStorage.getItem(
+        CRYPTO_PREFIX + userId
+      );
+    } catch (_) {}
+
+    if (!stored) {
+      return false;
+    }
+
+    try {
+      const key = await crypto.subtle.importKey(
+        "raw",
+        unb64(stored),
+        {
+          name: "AES-GCM"
+        },
+        false,
+        ["encrypt", "decrypt"]
+      );
+
+      await saveSecureKey(userId, key);
+
+      try {
+        localStorage.removeItem(
+          CRYPTO_PREFIX + userId
+        );
+      } catch (_) {}
+
+      PM.documentKey = key;
+
+      return true;
+
+    } catch (error) {
+      console.error(
+        "Legacy document key migration failed:",
+        error
+      );
+
+      return false;
+    }
   };
-
+  
   PM.unlockDocuments = async (password, userId) => {
-    const key = await PM.deriveDocumentKey(password, userId);
-    PM.documentKey = key;
-    await PM.saveDocumentKey(key, userId);
-    return key;
-  };
+  const key = await PM.deriveDocumentKey(
+    password,
+    userId
+  );
 
+  PM.documentKey = key;
+
+  await PM.saveDocumentKey(
+    key,
+    userId
+  );
+
+  PM.markSessionUnlocked();
+
+  return key;
+};
+
+  /*
+   * Logout should clear ONLY the in-memory key.
+   *
+   * The secure IndexedDB key must remain so that a later
+   * passkey authentication can restore it.
+   */
   PM.clearDocumentKey = (userId) => {
     PM.documentKey = null;
-    if (userId) localStorage.removeItem(CRYPTO_PREFIX + userId);
+
+    /*
+     * DO NOT delete the IndexedDB key here.
+     *
+     * userId is intentionally unused because logout should
+     * not destroy the device's passkey-unlock capability.
+     */
+  };
+
+  /*
+   * Permanently remove the device encryption key.
+   *
+   * This can be used later for account deletion / device reset.
+   */
+  PM.deleteStoredDocumentKey = async (userId) => {
+    if (!userId) return;
+
+    await deleteSecureKey(userId);
+
+    try {
+      localStorage.removeItem(
+        CRYPTO_PREFIX + userId
+      );
+    } catch (_) {}
+
+    if (PM.user?.id === userId) {
+      PM.documentKey = null;
+    }
   };
 
   PM.encryptFile = async (file) => {

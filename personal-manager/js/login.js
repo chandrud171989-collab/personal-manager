@@ -362,6 +362,8 @@
               data.user.id
             );
 
+            PM.markSessionUnlocked();
+
             location.href = "index.html";
           } else {
             render(
@@ -390,6 +392,8 @@
           password,
           data.user.id
         );
+        
+        PM.markSessionUnlocked();
 
         location.href = "index.html";
 
@@ -427,12 +431,6 @@
         const restored = await PM.restoreDocumentKey(user.id);
 
         if (!restored) {
-          /*
-           * The user is authenticated, but this device
-           * does not have the document encryption key.
-           *
-           * Keep password login as the fallback.
-           */
           await client.auth.signOut({ scope: "local" });
 
           render(
@@ -443,8 +441,10 @@
           return;
         }
 
-        location.href = "index.html";
+        PM.markSessionUnlocked();
 
+        location.href = "index.html";
+        
       } catch (e) {
         console.error("Passkey login error:", e);
 
