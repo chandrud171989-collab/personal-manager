@@ -498,6 +498,8 @@
           throw error;
         }
 
+        btn.textContent = "Securing your data...";
+
         await PM.unlockDocuments(
           password,
           data.user.id
