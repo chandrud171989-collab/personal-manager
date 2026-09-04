@@ -501,6 +501,15 @@ async function showPasskeySetupPrompt() {
 
             PM.markSessionUnlocked();
 
+            console.log("[PM] Password login successful. Checking passkey prompt...");
+
+            if (!localStorage.getItem(PASSKEY_PROMPT_KEY)) {
+              console.log("[PM] Showing passkey setup prompt...");
+              await showPasskeySetupPrompt();
+              } else {
+              console.log("[PM] Passkey prompt already dismissed.");
+            }
+
             location.href = "index.html";
           } else {
             render(
@@ -531,8 +540,6 @@ async function showPasskeySetupPrompt() {
           password,
           data.user.id
         );
-
-        PM.markSessionUnlocked();
 
         PM.markSessionUnlocked();
 
