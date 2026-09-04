@@ -368,23 +368,41 @@ PM.clearSessionUnlocked = () => {
   }
 
   async function saveSecureKey(userId, key) {
-    const db = await openKeyDatabase();
+  const db = await openKeyDatabase();
 
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(KEY_STORE_NAME, "readwrite");
-      const store = tx.objectStore(KEY_STORE_NAME);
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(KEY_STORE_NAME, "readwrite");
+    const store = tx.objectStore(KEY_STORE_NAME);
 
-      store.put({
-        userId,
-        key
-      });
-
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(tx.error || new Error("Unable to save document key."));
+    const request = store.put({
+      userId,
+      key
     });
-  }
 
+    request.onsuccess = () => resolve();
+
+    request.onerror = () => {
+      reject(
+        request.error ||
+        new Error("Unable to save document key.")
+      );
+    };
+
+    tx.onerror = () => {
+      reject(
+        tx.error ||
+        new Error("Unable to save document key.")
+      );
+    };
+
+    tx.onabort = () => {
+      reject(
+        tx.error ||
+        new Error("Unable to save document key.")
+      );
+    };
+  });
+}
   async function loadSecureKey(userId) {
     const db = await openKeyDatabase();
 
