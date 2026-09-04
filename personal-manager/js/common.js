@@ -594,45 +594,22 @@ PM.clearSessionUnlocked = () => {
     throw new Error("Unable to unlock document encryption.");
   }
 
-  /*
-   * If this device already has the user's secure document key,
-   * restore it instead of deriving it again.
-   */
-  try {
-    const existingKey = await loadSecureKey(userId);
-
-    if (existingKey) {
-      PM.documentKey = existingKey;
-      PM.markSessionUnlocked();
-      return existingKey;
-    }
-  } catch (error) {
-    console.warn(
-      "Existing secure document key could not be restored. Deriving a new key.",
-      error
-    );
-  }
-
-  /*
-   * First login on this device:
-   * derive the document encryption key from the password.
-   */
-  const key = await PM.deriveDocumentKey(
-    password,
-    userId
-  );
+  const key = await PM.deriveDocumentKey(password, userId);
 
   PM.documentKey = key;
-
-  /*
-   * Save the key for future password/passkey logins.
-   */
-  await PM.saveDocumentKey(
-    key,
-    userId
-  );
-
   PM.markSessionUnlocked();
+
+  // Save the encryption key and expose the promise
+  PM.documentKeySavePromise = saveSecureKey(userId, key)
+    .then(() => {
+      try {
+        localStorage.removeItem(CRYPTO_PREFIX + userId);
+      } catch (_) {}
+    })
+    .catch((error) => {
+      console.error("Unable to save document encryption key:", error);
+      throw error;
+    });
 
   return key;
 };
