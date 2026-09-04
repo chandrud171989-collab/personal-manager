@@ -589,27 +589,37 @@ PM.clearSessionUnlocked = () => {
     }
   };
   
- PM.unlockDocuments = async (password, userId) => {
+  PM.unlockDocuments = async (password, userId) => {
   if (!password || !userId) {
     throw new Error("Unable to unlock document encryption.");
   }
 
+  console.log("[PM] Starting document key derivation...");
+  console.time("[PM] deriveDocumentKey");
+
   const key = await PM.deriveDocumentKey(password, userId);
+
+  console.timeEnd("[PM] deriveDocumentKey");
+  console.log("[PM] Document key derived successfully.");
 
   PM.documentKey = key;
   PM.markSessionUnlocked();
 
-  // Save the encryption key and expose the promise
-  PM.documentKeySavePromise = saveSecureKey(userId, key)
+  console.log("[PM] Starting secure key save...");
+
+  saveSecureKey(userId, key)
     .then(() => {
+      console.log("[PM] Secure key saved successfully.");
+
       try {
         localStorage.removeItem(CRYPTO_PREFIX + userId);
       } catch (_) {}
     })
     .catch((error) => {
-      console.error("Unable to save document encryption key:", error);
-      throw error;
+      console.error("[PM] Secure key save failed:", error);
     });
+
+  console.log("[PM] unlockDocuments completed.");
 
   return key;
 };
