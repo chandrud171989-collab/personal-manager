@@ -47,6 +47,37 @@
           <div class="stat-card"><div class="stat-num">${soon}</div><div class="stat-label">Due in 7 days</div></div>
           <div class="stat-card"><div class="stat-num">${items.length}</div><div class="stat-label">Total tracked</div></div>
         </div>
+        <div class="section">
+          <div class="section-head">
+            <span class="section-title">Security</span>
+          </div>
+
+          <div class="card" style="display:block;">
+            <div style="font-weight:800;font-size:16px;">
+              🔐 Fingerprint login
+            </div>
+
+            <div class="status">
+              Sign in faster using your fingerprint, face unlock, or device PIN.
+            </div>
+
+            <button
+              class="btn"
+              id="registerPasskeyBtn"
+              type="button"
+              style="width:100%;margin-top:14px;"
+            >
+              Enable fingerprint login
+            </button>
+
+            <div
+              id="passkeyStatus"
+              class="status"
+              style="text-align:center;"
+            ></div>
+          </div>
+        </div>
+
         <div class="section"><div class="section-head"><span class="section-title">Upcoming reminders</span><span class="section-count">${upcoming.length}</span></div>
           ${upcoming.length ? upcoming.map(card).join("") : '<div class="empty">Nothing due in the next month.</div>'}
         </div>
@@ -55,7 +86,49 @@
         </div>
         <div class="section"><div class="section-head"><span class="section-title">Maintenance due</span><span class="section-count">${due.length}</span></div>
           ${due.length ? due.map(card).join("") : '<div class="empty">Nothing needs servicing soon.</div>'}
-        </div>`;
+                </div>`;
+
+      document.getElementById("registerPasskeyBtn")?.addEventListener("click", async () => {
+        const btn = document.getElementById("registerPasskeyBtn");
+        const status = document.getElementById("passkeyStatus");
+
+        if (!btn) return;
+
+        btn.disabled = true;
+        btn.textContent = "Registering...";
+
+        try {
+          const client = PM.client;
+
+          if (!client?.auth?.registerPasskey) {
+            throw new Error("Passkey registration is not available.");
+          }
+
+          const { data, error } = await client.auth.registerPasskey();
+
+          if (error) throw error;
+
+          console.log("Passkey registered:", data);
+
+          btn.textContent = "✓ Fingerprint login enabled";
+
+          if (status) {
+            status.textContent =
+              "You can now use fingerprint, face unlock, or device PIN to sign in.";
+          }
+
+        } catch (error) {
+          console.error("Passkey registration error:", error);
+
+          btn.disabled = false;
+          btn.textContent = "Enable fingerprint login";
+
+          if (status) {
+            status.textContent =
+              error?.message || "Passkey registration failed.";
+          }
+        }
+        });
     } catch (e) {
       console.error(e);
       view.innerHTML = `<div class="error">${PM.escape(e.message || String(e))}</div>`;
