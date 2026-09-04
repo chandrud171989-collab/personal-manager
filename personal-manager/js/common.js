@@ -589,7 +589,7 @@ PM.clearSessionUnlocked = () => {
     }
   };
   
-  PM.unlockDocuments = async (password, userId) => {
+ PM.unlockDocuments = async (password, userId) => {
   if (!password || !userId) {
     throw new Error("Unable to unlock document encryption.");
   }
