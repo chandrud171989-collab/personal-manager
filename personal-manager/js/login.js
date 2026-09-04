@@ -507,10 +507,6 @@
 
         PM.markSessionUnlocked();
 
-        if (!localStorage.getItem(PASSKEY_PROMPT_KEY)) {
-          await showPasskeySetupPrompt();
-        }
-
         location.href = "index.html";
 
       } catch (e) {
