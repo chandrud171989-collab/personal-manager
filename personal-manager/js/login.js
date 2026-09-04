@@ -534,6 +534,15 @@ async function showPasskeySetupPrompt() {
 
         PM.markSessionUnlocked();
 
+        PM.markSessionUnlocked();
+
+        // Ask user to enable fingerprint/passkey login
+        const dismissed = localStorage.getItem(PASSKEY_PROMPT_KEY);
+
+        if (!dismissed) {
+          await showPasskeySetupPrompt();
+        }
+
         location.href = "index.html";
 
       } catch (e) {
