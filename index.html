@@ -438,6 +438,88 @@ body::before{
 }
 </style>
 
+
+<style id="cidstech-product-logo-overrides">
+.project-logo-art{
+  position:relative;
+  min-height:465px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+}
+.logo-halo{
+  position:absolute;
+  width:270px;
+  height:270px;
+  border-radius:50%;
+  filter:blur(2px);
+  animation:logoHalo 7s ease-in-out infinite alternate;
+}
+.pm-halo{
+  background:radial-gradient(circle,rgba(22,223,255,.22) 0%,rgba(59,130,255,.12) 38%,transparent 72%);
+}
+.gold-halo{
+  background:radial-gradient(circle,rgba(255,190,37,.20) 0%,rgba(237,67,255,.08) 38%,transparent 72%);
+}
+@keyframes logoHalo{
+  to{transform:scale(1.16);opacity:.72}
+}
+.product-logo-image{
+  position:relative;
+  z-index:2;
+  width:190px;
+  height:190px;
+  object-fit:contain;
+  border-radius:40px;
+  filter:drop-shadow(0 24px 48px rgba(0,0,0,.28));
+  animation:productLogoFloat 5s ease-in-out infinite;
+}
+@keyframes productLogoFloat{
+  50%{transform:translateY(-10px) scale(1.03)}
+}
+.gold-original-logo{
+  position:relative;
+  z-index:2;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  text-align:center;
+  transform:translateY(0);
+  animation:productLogoFloat 5s ease-in-out infinite;
+}
+.gold-coin{
+  font-size:7rem;
+  line-height:1;
+  filter:drop-shadow(0 18px 32px rgba(255,172,0,.30));
+}
+.gold-original-logo strong{
+  margin-top:14px;
+  font-size:clamp(2rem,4vw,3.6rem);
+  line-height:1;
+  letter-spacing:-.055em;
+  background:linear-gradient(90deg,#ffe27a,#ffb300,#ff6b00);
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+}
+.gold-original-logo span{
+  margin-top:10px;
+  color:rgba(255,255,255,.58);
+  font-size:.78rem;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+}
+@media (max-width:900px){
+  .project-logo-art{min-height:315px}
+}
+@media (max-width:640px){
+  .project-logo-art{min-height:280px}
+  .product-logo-image{width:150px;height:150px}
+  .gold-coin{font-size:5.5rem}
+}
+</style>
+
 </head>
 <body>
 
@@ -638,34 +720,9 @@ body::before{
                 <a class="project-button" href="https://cidstech.in/personal-manager/" target="_blank" rel="noopener">Open Personal Manager <span>↗</span></a>
               </div>
 
-              <div class="project-slide-art" aria-hidden="true">
-                <div class="pm-ring"></div>
-                <div class="pm-visual">
-                  <div class="pm-window">
-                    <div class="pm-bar">
-                      <i></i><i></i><i></i>
-                    </div>
-                    <div class="pm-body">
-                      <div class="pm-side">
-                        <b>P</b>
-                        <span></span><span></span><span></span><span></span>
-                      </div>
-                      <div class="pm-main">
-                        <small>Good morning</small>
-                        <h4>Your life, organised.</h4>
-                        <div class="pm-stat-row">
-                          <span class="pm-stat"><b>12</b>Tasks</span>
-                          <span class="pm-stat"><b>05</b>Reminders</span>
-                          <span class="pm-stat"><b>08</b>Documents</span>
-                        </div>
-                        <div class="pm-mini-row">
-                          <i class="pm-mini"></i>
-                          <i class="pm-mini"></i>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              <div class="project-slide-art project-logo-art" aria-label="Personal Manager logo">
+                <div class="logo-halo pm-halo"></div>
+                <img class="product-logo-image" src="https://cidstech.in/personal-manager/icon-512.png" alt="Personal Manager original logo">
               </div>
             </div>
           </article>
@@ -685,14 +742,12 @@ body::before{
                 <a class="project-button" href="https://chandrud171989-collab.github.io/blind-path/" target="_blank" rel="noopener">Play Gold Hunt 3D <span>↗</span></a>
               </div>
 
-              <div class="project-slide-art" aria-hidden="true">
-                <div class="gold-visual">
-                  <div class="gold-floor"></div>
-                  <div class="gold-beam"></div>
-                  <div class="gold-clue"></div>
-                  <span class="spark a"></span>
-                  <span class="spark b"></span>
-                  <span class="spark c"></span>
+              <div class="project-slide-art project-logo-art gold-logo-art" aria-label="Gold Hunt 3D original branding">
+                <div class="logo-halo gold-halo"></div>
+                <div class="gold-original-logo">
+                  <div class="gold-coin">🪙</div>
+                  <strong>Gold Hunt 3D</strong>
+                  <span>Multiplayer forest maze</span>
                 </div>
               </div>
             </div>
