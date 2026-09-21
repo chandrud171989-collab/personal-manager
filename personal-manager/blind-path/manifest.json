@@ -1,0 +1,23 @@
+{
+  "name": "Gold Hunt 3D",
+  "short_name": "Gold Hunt 3D",
+  "description": "A multiplayer 3D forest maze game.",
+  "start_url": "/blind-path/",
+  "scope": "/blind-path/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#87b98a",
+  "theme_color": "#87b98a",
+  "icons": [
+    {
+      "src": "/blind-path/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/blind-path/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
