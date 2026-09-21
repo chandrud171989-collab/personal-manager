@@ -6,8 +6,445 @@
   <meta name="description" content="CIDSTech — We build digital products, platforms and experiences that help businesses move forward.">
   <title>CIDSTech — We build what's next.</title>
   <link rel="stylesheet" href="style.css">
+
+<style id="cidstech-advanced-effects">
+:root{
+  --c-cyan:#16dfff;
+  --c-blue:#3b82ff;
+  --c-violet:#8b5cf6;
+  --c-pink:#ed43ff;
+  --c-dark:#061225;
+}
+html{scroll-behavior:smooth}
+body{
+  overflow-x:hidden;
+  background:
+    radial-gradient(circle at 8% 12%,rgba(22,223,255,.10),transparent 26%),
+    radial-gradient(circle at 92% 20%,rgba(139,92,246,.11),transparent 28%),
+    linear-gradient(180deg,#fbfdff 0%,#f3f7fc 52%,#edf3fa 100%);
+}
+body::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:-5;
+  background-image:
+    linear-gradient(rgba(20,44,82,.035) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(20,44,82,.035) 1px,transparent 1px);
+  background-size:44px 44px;
+  mask-image:linear-gradient(to bottom,#000,transparent 82%);
+}
+.site-header{
+  background:rgba(255,255,255,.72)!important;
+  backdrop-filter:blur(18px);
+  -webkit-backdrop-filter:blur(18px);
+  border-bottom:1px solid rgba(10,32,70,.08);
+}
+.scroll-progress{
+  position:fixed;
+  left:0;
+  top:0;
+  width:0;
+  height:3px;
+  z-index:10000;
+  background:linear-gradient(90deg,var(--c-cyan),var(--c-blue),var(--c-violet),var(--c-pink));
+  box-shadow:0 0 16px rgba(59,130,255,.55);
+}
+.ambient{
+  position:fixed;
+  inset:0;
+  overflow:hidden;
+  pointer-events:none;
+  z-index:-3;
+}
+.ambient span{
+  position:absolute;
+  display:block;
+  border-radius:50%;
+  filter:blur(6px);
+}
+.ambient .one{
+  width:260px;height:260px;left:-100px;top:15%;
+  background:radial-gradient(circle,rgba(22,223,255,.18),transparent 70%);
+  animation:ambient1 13s ease-in-out infinite alternate;
+}
+.ambient .two{
+  width:340px;height:340px;right:-120px;top:32%;
+  background:radial-gradient(circle,rgba(139,92,246,.17),transparent 70%);
+  animation:ambient2 15s ease-in-out infinite alternate;
+}
+.ambient .three{
+  width:300px;height:300px;left:42%;bottom:-130px;
+  background:radial-gradient(circle,rgba(237,67,255,.10),transparent 70%);
+  animation:ambient3 17s ease-in-out infinite alternate;
+}
+@keyframes ambient1{to{transform:translate(90px,70px) scale(1.18)}}
+@keyframes ambient2{to{transform:translate(-80px,-70px) scale(1.12)}}
+@keyframes ambient3{to{transform:translate(50px,-90px) scale(1.15)}}
+
+.hero{position:relative;isolation:isolate}
+.hero::before{
+  content:"";
+  position:absolute;
+  width:520px;height:520px;
+  right:-110px;top:-90px;
+  border-radius:50%;
+  background:conic-gradient(from 10deg,rgba(22,223,255,.06),rgba(59,130,255,.13),rgba(139,92,246,.16),rgba(237,67,255,.08),rgba(22,223,255,.06));
+  filter:blur(14px);
+  z-index:-1;
+  animation:heroRing 14s linear infinite;
+}
+@keyframes heroRing{to{transform:rotate(360deg)}}
+.hero h1 em{
+  background:linear-gradient(90deg,var(--c-blue),var(--c-violet),var(--c-pink));
+  background-size:200% 100%;
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+  animation:gradientShift 8s ease-in-out infinite alternate;
+}
+@keyframes gradientShift{to{background-position:100% 0}}
+.hero-art .glass-shape{
+  animation:glassFloat 6s ease-in-out infinite;
+  box-shadow:0 30px 80px rgba(25,58,120,.16),inset 0 1px rgba(255,255,255,.6);
+}
+@keyframes glassFloat{50%{transform:translateY(-13px) rotate(1.4deg)}}
+.hero-art .orb-one{animation:orbOne 9s ease-in-out infinite alternate}
+.hero-art .orb-two{animation:orbTwo 11s ease-in-out infinite alternate}
+@keyframes orbOne{to{transform:translate(36px,-22px) scale(1.08)}}
+@keyframes orbTwo{to{transform:translate(-26px,28px) scale(.92)}}
+.service-card,.product-feature{
+  transition:transform .45s cubic-bezier(.2,.8,.2,1),box-shadow .45s ease;
+}
+.service-card:hover,.product-feature:hover{
+  transform:translateY(-8px);
+  box-shadow:0 28px 80px rgba(13,37,79,.12);
+}
+.product-feature{position:relative;overflow:hidden}
+.product-feature::before{
+  content:"";
+  position:absolute;
+  inset:-35%;
+  background:
+    radial-gradient(circle at 25% 28%,rgba(22,223,255,.10),transparent 20%),
+    radial-gradient(circle at 75% 68%,rgba(139,92,246,.10),transparent 23%);
+  animation:featureGlow 12s ease-in-out infinite alternate;
+  pointer-events:none;
+}
+@keyframes featureGlow{to{transform:translate(30px,-25px) scale(1.08)}}
+.product-orb{animation:productOrb 7s ease-in-out infinite alternate}
+@keyframes productOrb{to{transform:translate(18px,-14px) scale(1.08)}}
+
+/* ===== Projects carousel ===== */
+#work{position:relative;overflow:hidden}
+.projects-carousel{margin-top:42px}
+.projects-viewport{
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-width:none;
+  scroll-snap-type:x mandatory;
+  -webkit-overflow-scrolling:touch;
+  padding:8px 4px 28px;
+}
+.projects-viewport::-webkit-scrollbar{display:none}
+.projects-track{display:flex;gap:24px;width:max-content}
+.project-slide{
+  flex:0 0 min(82vw,980px);
+  min-height:465px;
+  scroll-snap-align:center;
+  scroll-snap-stop:always;
+  position:relative;
+  overflow:hidden;
+  border-radius:32px;
+  color:#fff;
+  background:
+    radial-gradient(circle at 85% 20%,rgba(139,92,246,.18),transparent 27%),
+    radial-gradient(circle at 22% 75%,rgba(22,223,255,.14),transparent 28%),
+    linear-gradient(135deg,#071326 0%,#0b1b37 60%,#111b3c 100%);
+  border:1px solid rgba(255,255,255,.12);
+  box-shadow:0 30px 95px rgba(8,27,66,.24);
+}
+.project-slide::before{
+  content:"";
+  position:absolute;
+  inset:-25%;
+  background:conic-gradient(from 60deg,transparent 0 35%,rgba(59,130,255,.08),transparent 50 75%,rgba(237,67,255,.06),transparent 88%);
+  animation:projectAura 15s linear infinite;
+}
+@keyframes projectAura{to{transform:rotate(360deg)}}
+.project-slide-inner{
+  position:relative;
+  z-index:1;
+  min-height:465px;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+}
+.project-slide-copy{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  padding:54px;
+}
+.project-slide-copy .kicker{
+  color:#66eaff;
+  font-size:.72rem;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+  font-weight:800;
+  margin-bottom:13px;
+}
+.project-slide-copy h3{
+  margin:0 0 16px;
+  font-size:clamp(2.3rem,5vw,4.5rem);
+  line-height:.96;
+  letter-spacing:-.06em;
+}
+.project-slide-copy p{
+  max-width:490px;
+  color:rgba(234,242,255,.76);
+  line-height:1.72;
+}
+.project-tags{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin:20px 0 26px;
+}
+.project-tags span{
+  padding:7px 10px;
+  border-radius:999px;
+  font-size:.68rem;
+  color:rgba(255,255,255,.82);
+  border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.05);
+}
+.project-button{
+  width:max-content;
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  text-decoration:none;
+  background:#fff;
+  color:#091426!important;
+  padding:12px 16px;
+  border-radius:12px;
+  font-weight:800;
+  box-shadow:0 14px 34px rgba(0,0,0,.22);
+}
+.project-slide-art{
+  min-height:465px;
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  perspective:1200px;
+  background:
+    radial-gradient(circle at 50% 50%,rgba(47,117,255,.13),transparent 45%),
+    linear-gradient(135deg,rgba(255,255,255,.04),transparent 65%);
+}
+
+/* Personal Manager visual */
+.pm-visual{
+  width:min(84%,500px);
+  aspect-ratio:16/10;
+  position:relative;
+  transform-style:preserve-3d;
+  animation:pmFloat 6s ease-in-out infinite;
+}
+@keyframes pmFloat{50%{transform:rotateY(-7deg) rotateX(4deg) translateY(-10px)}}
+.pm-window{
+  position:absolute;
+  inset:9% 7% 13%;
+  border-radius:20px;
+  overflow:hidden;
+  background:linear-gradient(145deg,#f6fbff,#e5f0fc);
+  border:1px solid rgba(255,255,255,.85);
+  box-shadow:0 28px 65px rgba(0,0,0,.38);
+}
+.pm-bar{
+  height:16%;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:0 15px;
+  background:#fff;
+  border-bottom:1px solid #d6e3f2;
+}
+.pm-bar i{width:7px;height:7px;border-radius:50%;background:#9db3cf}
+.pm-body{display:grid;grid-template-columns:17% 1fr;height:84%}
+.pm-side{
+  background:#081a34;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:12px;
+  padding-top:14px;
+}
+.pm-side b{color:#fff}
+.pm-side span{display:block;width:17px;height:3px;border-radius:3px;background:#5b78a0}
+.pm-main{padding:18px}
+.pm-main small{color:#6e84a2}
+.pm-main h4{margin:4px 0 13px;color:#112441;font-size:1.05rem}
+.pm-stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pm-stat{
+  padding:9px;
+  border-radius:10px;
+  background:#fff;
+  border:1px solid #d8e5f3;
+  color:#617894;
+  font-size:.58rem;
+}
+.pm-stat b{display:block;font-size:.95rem;color:#172b47}
+.pm-mini-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.pm-mini{height:70px;border-radius:11px;border:1px solid #d7e4f1;background:linear-gradient(135deg,#fff,#e9f2fd)}
+.pm-ring{
+  position:absolute;
+  width:82%;
+  aspect-ratio:1;
+  border:1px solid rgba(22,223,255,.22);
+  border-radius:50%;
+  transform:rotateX(65deg) translateZ(-30px);
+  animation:ringSpin 13s linear infinite;
+}
+.pm-ring::before,.pm-ring::after{
+  content:"";
+  position:absolute;
+  width:10px;height:10px;border-radius:50%;
+  background:#16dfff;
+  box-shadow:0 0 24px rgba(22,223,255,.85);
+}
+.pm-ring::before{left:8%;top:40%}
+.pm-ring::after{right:8%;bottom:22%;background:#a855f7;box-shadow:0 0 24px rgba(168,85,247,.8)}
+@keyframes ringSpin{to{transform:rotateX(65deg) rotateZ(360deg) translateZ(-30px)}}
+
+/* Gold Hunt 3D visual */
+.gold-visual{
+  position:relative;
+  width:min(86%,520px);
+  aspect-ratio:16/10;
+}
+.gold-floor{
+  position:absolute;
+  left:6%;right:6%;bottom:13%;height:60%;
+  border-radius:28px;
+  border:1px solid rgba(255,255,255,.10);
+  background:
+    repeating-linear-gradient(90deg,rgba(255,255,255,.035) 0 1px,transparent 1px 40px),
+    repeating-linear-gradient(0deg,rgba(255,255,255,.035) 0 1px,transparent 1px 40px),
+    linear-gradient(135deg,rgba(22,223,255,.08),rgba(139,92,246,.05));
+  transform:rotateX(63deg) rotateZ(-10deg);
+  box-shadow:0 30px 75px rgba(0,0,0,.35);
+}
+.gold-clue{
+  position:absolute;
+  left:50%;top:43%;
+  width:92px;height:92px;
+  transform:translate(-50%,-50%);
+  border-radius:50%;
+  background:radial-gradient(circle at 32% 24%,#fff8bb 0 7%,#ffe05a 20%,#ffb20a 44%,#f37500 68%,#782900 100%);
+  box-shadow:0 0 28px rgba(255,188,0,.7),0 0 90px rgba(255,127,0,.22);
+  animation:goldPulse 2.2s ease-in-out infinite;
+}
+.gold-clue::after{
+  content:"";
+  position:absolute;
+  inset:15px;
+  border:2px solid rgba(255,247,204,.76);
+  border-radius:50%;
+  transform:rotateX(60deg);
+}
+@keyframes goldPulse{
+  50%{transform:translate(-50%,-50%) scale(1.1);box-shadow:0 0 40px rgba(255,188,0,.85),0 0 110px rgba(255,127,0,.26)}
+}
+.gold-beam{
+  position:absolute;
+  left:50%;top:10%;
+  width:2px;height:290px;
+  transform:translateX(-50%) rotate(20deg);
+  background:linear-gradient(180deg,transparent,#64ebff,transparent);
+  animation:beamSweep 2.8s ease-in-out infinite alternate;
+  opacity:.72;
+}
+@keyframes beamSweep{to{height:340px;opacity:1}}
+.spark{
+  position:absolute;
+  width:5px;height:5px;border-radius:50%;
+  background:#a6f5ff;
+  box-shadow:0 0 14px #53e8ff;
+}
+.spark.a{left:25%;top:27%;animation:sparkA 4s infinite}
+.spark.b{right:24%;top:22%;animation:sparkB 4.8s infinite}
+.spark.c{right:28%;bottom:25%;animation:sparkC 5.2s infinite}
+@keyframes sparkA{50%{transform:translate(34px,24px) scale(.5);opacity:.25}}
+@keyframes sparkB{50%{transform:translate(-26px,42px) scale(1.25);opacity:.75}}
+@keyframes sparkC{50%{transform:translate(-34px,-25px) scale(.6);opacity:.25}}
+
+.project-dots{
+  display:flex;
+  justify-content:center;
+  gap:8px;
+  margin-top:9px;
+}
+.project-dots button{
+  width:8px;height:8px;
+  padding:0;border:0;border-radius:999px;
+  background:#b7c5d7;
+  cursor:pointer;
+  transition:.3s ease;
+}
+.project-dots button.active{
+  width:28px;
+  background:linear-gradient(90deg,var(--c-cyan),var(--c-violet));
+}
+.project-hint{
+  text-align:center;
+  margin-top:9px;
+  color:#6d7f97;
+  font-size:.72rem;
+}
+
+/* reveal motion enhancement */
+.reveal{
+  transition-delay:var(--reveal-delay,0ms);
+}
+.reveal.visible{
+  animation:contentRise .9s cubic-bezier(.2,.8,.2,1) both;
+}
+@keyframes contentRise{
+  from{opacity:0;transform:translateY(26px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
+@media (max-width:900px){
+  .project-slide{flex-basis:90vw}
+  .project-slide-inner{grid-template-columns:1fr}
+  .project-slide-copy{padding:36px 28px 24px}
+  .project-slide-art{min-height:315px}
+}
+@media (max-width:640px){
+  .project-slide{border-radius:24px}
+  .project-slide-copy h3{font-size:2.35rem}
+  .project-slide-copy p{font-size:.91rem}
+  .project-slide-art{min-height:280px}
+  .pm-visual,.gold-visual{width:91%}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.01ms!important;
+    animation-iteration-count:1!important;
+    scroll-behavior:auto!important;
+  }
+}
+</style>
+
 </head>
 <body>
+
+<div class="scroll-progress" id="scrollProgress"></div>
+<div class="ambient" aria-hidden="true">
+  <span class="one"></span><span class="two"></span><span class="three"></span>
+</div>
 
 <header class="site-header">
   <a class="brand" href="#home" aria-label="CIDSTech home">
@@ -34,8 +471,8 @@
       <div class="eyebrow"><span></span> Software company</div>
       <h1>We build<br><em>what's next.</em></h1>
       <p class="hero-text">
-        We design and build thoughtful digital products, platforms and experiences
-        that help businesses grow, innovate and lead with confidence.
+        We design and build modern digital products, web experiences and interactive solutions
+        that turn ambitious ideas into products people love to use.
       </p>
       <div class="hero-actions">
         <a class="button button-dark" href="#work">Explore our work <span>↗</span></a>
@@ -175,66 +612,102 @@
   <section class="work section" id="work">
     <div class="work-heading reveal">
       <div>
-        <div class="eyebrow"><span></span> Selected work</div>
-        <h2>Work that moves<br>business forward.</h2>
+        <div class="eyebrow"><span></span> Our projects</div>
+        <h2>Products that turn<br>ideas into experiences.</h2>
       </div>
-      <p>Every project starts with a problem worth solving and ends with an experience worth using.</p>
+      <p>Explore the products we are building — from personal productivity to immersive interactive experiences.</p>
     </div>
 
-    <div class="project-list">
-      <article class="project reveal">
-        <div class="project-visual project-one">
-          <div class="dashboard">
-            <div class="dash-top"><b>Overview</b><span>•••</span></div>
-            <div class="dash-number">₹ 8.42M</div>
-            <div class="dash-chart"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-            <div class="dash-cards"><span></span><span></span><span></span></div>
-          </div>
-        </div>
-        <div class="project-info">
-          <span>01 / Digital platform</span>
-          <h3>Finovo</h3>
-          <p>A modern financial experience designed to make complex information feel simple and actionable.</p>
-          <a href="#contact">View case study <span>↗</span></a>
-        </div>
-      </article>
 
-      <article class="project project-reverse reveal">
-        <div class="project-visual project-two">
-          <div class="phone">
-            <div class="phone-notch"></div>
-            <small>Discover</small>
-            <strong>Plan your<br>next escape.</strong>
-            <div class="travel-card"></div>
-            <div class="travel-lines"><i></i><i></i><i></i></div>
-          </div>
-          <div class="plane">✈</div>
-        </div>
-        <div class="project-info">
-          <span>02 / Consumer experience</span>
-          <h3>Travela</h3>
-          <p>A focused travel planning experience that turns inspiration into confident decisions.</p>
-          <a href="#contact">View case study <span>↗</span></a>
-        </div>
-      </article>
+    <div class="projects-carousel reveal">
+      <div class="projects-viewport" id="projectsViewport" aria-label="CIDSTech projects">
+        <div class="projects-track">
 
-      <article class="project reveal">
-        <div class="project-visual project-three">
-          <div class="health-panel">
-            <div class="avatar"></div><div class="health-title"></div>
-            <div class="health-lines"><i></i><i></i><i></i><i></i></div>
-            <div class="health-pill"></div>
-          </div>
-          <div class="health-orb"></div>
+          <article class="project-slide">
+            <div class="project-slide-inner">
+              <div class="project-slide-copy">
+                <span class="kicker">01 / Live product</span>
+                <h3>Personal Manager</h3>
+                <p>Our private productivity workspace for documents, reminders, notes and personal information — designed to keep everyday life organised in one calm place.</p>
+                <div class="project-tags">
+                  <span>PWA</span>
+                  <span>Productivity</span>
+                  <span>Mobile</span>
+                  <span>Private workspace</span>
+                </div>
+                <a class="project-button" href="https://cidstech.in/personal-manager/" target="_blank" rel="noopener">Open Personal Manager <span>↗</span></a>
+              </div>
+
+              <div class="project-slide-art" aria-hidden="true">
+                <div class="pm-ring"></div>
+                <div class="pm-visual">
+                  <div class="pm-window">
+                    <div class="pm-bar">
+                      <i></i><i></i><i></i>
+                    </div>
+                    <div class="pm-body">
+                      <div class="pm-side">
+                        <b>P</b>
+                        <span></span><span></span><span></span><span></span>
+                      </div>
+                      <div class="pm-main">
+                        <small>Good morning</small>
+                        <h4>Your life, organised.</h4>
+                        <div class="pm-stat-row">
+                          <span class="pm-stat"><b>12</b>Tasks</span>
+                          <span class="pm-stat"><b>05</b>Reminders</span>
+                          <span class="pm-stat"><b>08</b>Documents</span>
+                        </div>
+                        <div class="pm-mini-row">
+                          <i class="pm-mini"></i>
+                          <i class="pm-mini"></i>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="project-slide">
+            <div class="project-slide-inner">
+              <div class="project-slide-copy">
+                <span class="kicker">02 / Interactive game</span>
+                <h3>Gold Hunt 3D</h3>
+                <p>An immersive browser-based 3D exploration game built around discovery, movement and hidden treasure — turning clues into an interactive world.</p>
+                <div class="project-tags">
+                  <span>3D</span>
+                  <span>Web Game</span>
+                  <span>Interactive</span>
+                  <span>Multiplayer</span>
+                </div>
+                <a class="project-button" href="https://chandrud171989-collab.github.io/blind-path/" target="_blank" rel="noopener">Play Gold Hunt 3D <span>↗</span></a>
+              </div>
+
+              <div class="project-slide-art" aria-hidden="true">
+                <div class="gold-visual">
+                  <div class="gold-floor"></div>
+                  <div class="gold-beam"></div>
+                  <div class="gold-clue"></div>
+                  <span class="spark a"></span>
+                  <span class="spark b"></span>
+                  <span class="spark c"></span>
+                </div>
+              </div>
+            </div>
+          </article>
+
         </div>
-        <div class="project-info">
-          <span>03 / Service platform</span>
-          <h3>Healthio</h3>
-          <p>A clear, human-centred platform designed to make everyday healthcare interactions easier.</p>
-          <a href="#contact">View case study <span>↗</span></a>
-        </div>
-      </article>
+      </div>
+
+      <div class="project-dots" aria-label="Project selector">
+        <button class="active" type="button" data-project="0" aria-label="Show Personal Manager"></button>
+        <button type="button" data-project="1" aria-label="Show Gold Hunt 3D"></button>
+      </div>
+      <div class="project-hint">Swipe, drag or use the indicators to explore our projects.</div>
     </div>
+
   </section>
 
   <section class="about section" id="about">
@@ -319,6 +792,58 @@
     });
   }, { threshold: 0.12 });
   document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+  const scrollProgress = document.getElementById('scrollProgress');
+  function updateScrollProgress(){
+    const root = document.documentElement;
+    const max = root.scrollHeight - window.innerHeight;
+    const pct = max > 0 ? (window.scrollY / max) * 100 : 0;
+    if(scrollProgress) scrollProgress.style.width = pct + '%';
+  }
+  window.addEventListener('scroll', updateScrollProgress, {passive:true});
+  updateScrollProgress();
+
+  const projectsViewport = document.getElementById('projectsViewport');
+  const projectSlides = [...document.querySelectorAll('.project-slide')];
+  const projectDots = [...document.querySelectorAll('.project-dots button')];
+  let projectTimer = null;
+
+  function setProjectDot(index){
+    projectDots.forEach((dot,i)=>dot.classList.toggle('active',i===index));
+  }
+
+  function showProject(index, restart=true){
+    if(!projectsViewport || !projectSlides[index]) return;
+    projectsViewport.scrollTo({
+      left: projectSlides[index].offsetLeft - 4,
+      behavior:'smooth'
+    });
+    setProjectDot(index);
+    if(restart) restartProjectTimer();
+  }
+
+  function restartProjectTimer(){
+    clearInterval(projectTimer);
+    projectTimer = setInterval(()=>{
+      if(!projectsViewport || projectSlides.length < 2) return;
+      const cardWidth = projectSlides[0].offsetWidth + 24;
+      const current = Math.round(projectsViewport.scrollLeft / Math.max(cardWidth,1));
+      showProject((current + 1) % projectSlides.length, false);
+    }, 5200);
+  }
+
+  projectDots.forEach((dot,i)=>dot.addEventListener('click',()=>showProject(i)));
+  projectsViewport?.addEventListener('scroll',()=>{
+    const cardWidth = (projectSlides[0]?.offsetWidth || 1) + 24;
+    const index = Math.round(projectsViewport.scrollLeft / cardWidth);
+    setProjectDot(Math.min(index, projectDots.length-1));
+  }, {passive:true});
+  projectsViewport?.addEventListener('mouseenter',()=>clearInterval(projectTimer));
+  projectsViewport?.addEventListener('mouseleave',restartProjectTimer);
+  projectsViewport?.addEventListener('pointerdown',()=>clearInterval(projectTimer));
+  projectsViewport?.addEventListener('pointerup',restartProjectTimer);
+  restartProjectTimer();
+
 </script>
 </body>
 </html>
